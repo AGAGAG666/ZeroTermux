@@ -39,10 +39,12 @@ public final class CodexSessionRepository {
         List<CodexSessionInfo> result = new ArrayList<>();
         for (IndexEntry entry : indexed.values()) {
             RolloutMeta meta = rollouts.get(entry.id);
+            // The index can outlive deleted/cleaned rollout files. Such rows cannot be resumed.
+            if (meta == null) continue;
             CodexSessionRegistry.Binding binding = CodexSessionRegistry.forConversation(entry.id);
             result.add(new CodexSessionInfo(entry.id, entry.title,
-                meta == null ? null : meta.cwd, Math.max(entry.updatedAt, meta == null ? 0 : meta.updatedAt),
-                meta == null ? null : meta.file, binding != null, binding == null ? null : binding.terminalHandle));
+                meta.cwd, Math.max(entry.updatedAt, meta.updatedAt), meta.file,
+                binding != null, binding == null ? null : binding.terminalHandle));
         }
         result.sort(Comparator.comparingLong(CodexSessionInfo::getUpdatedAt).reversed());
         return result;
