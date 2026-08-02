@@ -34,8 +34,10 @@ public final class CodexModelCatalogWriter {
             model.addProperty("support_verbosity", false);
             model.add("default_verbosity", JsonNull.INSTANCE);
             model.add("apply_patch_tool_type", JsonNull.INSTANCE);
-            model.addProperty("context_window", mapping.contextWindow > 0 ? mapping.contextWindow : 128000);
-            model.addProperty("max_context_window", mapping.contextWindow > 0 ? mapping.contextWindow : 128000);
+            model.addProperty("context_window", mapping.contextWindow > 0 ? mapping.contextWindow
+                : CodexProviderProfile.DEFAULT_CONTEXT_WINDOW);
+            model.addProperty("max_context_window", mapping.contextWindow > 0 ? mapping.contextWindow
+                : CodexProviderProfile.DEFAULT_CONTEXT_WINDOW);
             model.addProperty("priority", priority++);
             model.add("input_modalities", arrayOfTextAndImage());
             model.addProperty("shell_type", "shell_command");
@@ -63,8 +65,8 @@ public final class CodexModelCatalogWriter {
             fallback.addProperty("support_verbosity", false);
             fallback.add("default_verbosity", JsonNull.INSTANCE);
             fallback.add("apply_patch_tool_type", JsonNull.INSTANCE);
-            fallback.addProperty("context_window", 128000);
-            fallback.addProperty("max_context_window", 128000);
+            fallback.addProperty("context_window", CodexProviderProfile.DEFAULT_CONTEXT_WINDOW);
+            fallback.addProperty("max_context_window", CodexProviderProfile.DEFAULT_CONTEXT_WINDOW);
             fallback.addProperty("priority", 1000);
             fallback.add("input_modalities", arrayOfTextAndImage());
             fallback.addProperty("shell_type", "shell_command");

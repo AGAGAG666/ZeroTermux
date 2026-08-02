@@ -263,7 +263,8 @@ public class CodexProviderActivity extends AppCompatActivity {
                 for (CodexProviderProfile.ModelMapping item : merged) if (item != null && item.model != null) existingModels.add(item.model);
                 for (CcsModelFetcher.Model item : result.models) {
                     if (TextUtils.isEmpty(item.id) || !existingModels.add(item.id)) continue;
-                    merged.add(new CodexProviderProfile.ModelMapping(item.id, item.id, 128000));
+                    merged.add(new CodexProviderProfile.ModelMapping(item.id, item.id,
+                        CodexProviderProfile.DEFAULT_CONTEXT_WINDOW));
                 }
                 if (TextUtils.isEmpty(model.getText().toString().trim()) && !result.models.isEmpty())
                     model.setText(result.models.get(0).id);
@@ -398,7 +399,7 @@ public class CodexProviderActivity extends AppCompatActivity {
             String[] parts = line.split("\\|", -1);
             String model = parts.length > 1 ? parts[1].trim() : parts[0].trim();
             if (model.isEmpty()) continue;
-            long context = 128000;
+            long context = CodexProviderProfile.DEFAULT_CONTEXT_WINDOW;
             if (parts.length > 2) try { context = Long.parseLong(parts[2].trim()); } catch (Exception ignored) {}
             result.add(new CodexProviderProfile.ModelMapping(parts[0].trim(), model, context));
         }

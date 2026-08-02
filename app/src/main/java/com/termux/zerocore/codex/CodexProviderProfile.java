@@ -11,6 +11,7 @@ public class CodexProviderProfile {
     public static final String FORMAT_RESPONSES = "openai_responses";
     public static final String FORMAT_CHAT = "openai_chat";
     public static final String FORMAT_ANTHROPIC = "anthropic";
+    public static final long DEFAULT_CONTEXT_WINDOW = 1_000_000L;
 
     public String id = UUID.randomUUID().toString();
     public String agent = AGENT_CODEX;
@@ -76,7 +77,7 @@ public class CodexProviderProfile {
     public static class ModelMapping {
         public String displayName = "";
         public String model = "";
-        public long contextWindow = 128000;
+        public long contextWindow = DEFAULT_CONTEXT_WINDOW;
         public Boolean supportsParallelToolCalls;
         public List<String> inputModalities;
         public String baseInstructions;
