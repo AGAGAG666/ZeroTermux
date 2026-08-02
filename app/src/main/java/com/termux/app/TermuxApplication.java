@@ -35,6 +35,7 @@ import com.termux.zerocore.libsu.LibSuManage;
 import com.termux.zerocore.utils.ClipBoardUtil;
 import com.zp.z_file.common.ZFileManageHelp;
 import com.zp.z_file.content.ZFileConfiguration;
+import com.zp.z_file.content.ZFileContentKt;
 import com.zp.z_file.util.LogUtils;
 import com.zp.z_file.util.ZFileUUtils;
 
@@ -146,6 +147,9 @@ public class TermuxApplication extends XHApplication {
         ZFileManageHelp.getInstance().init(new MyFileImageListener());
 ZFileManageHelp.getInstance().setFileOperateListener(new MyZFileOperateListener());
         ZFileConfiguration.Companion.setMApplicationContext(this);
+        // z_file defaults to /data/data/com.termux/files/, which is a parent of
+        // Termux home and can trigger its fragile permission/listFiles path.
+        ZFileContentKt.getZFileConfig().setFilePath(TermuxConstants.TERMUX_HOME_DIR_PATH);
         // Z7Extractor.init();
         Aria.init(this);
         Aria.get(this).getDownloadConfig().setMaxSpeed(0);
@@ -184,4 +188,3 @@ ZFileManageHelp.getInstance().setFileOperateListener(new MyZFileOperateListener(
     /***************************************** ZERO TERMUX END ******************************************/
 
 }
-

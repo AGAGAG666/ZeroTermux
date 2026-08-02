@@ -168,6 +168,7 @@ import com.termux.zerocore.utils.VideoUtils;
 import com.termux.zerocore.utils.WindowUtils;
 import com.termux.zerocore.view.BoomWindow;
 import com.termux.zerocore.zero.engine.ZeroCoreManage;
+import com.zp.z_file.content.ZFileContentKt;
 import com.zp.z_file.ui.ZFileListFragment;
 import com.zp.z_file.zerotermux.ZTConfig;
 
@@ -2458,6 +2459,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         if (index == 0) {
             LogUtils.e(TAG, "fragmentManager switch ZFileListFragment. ");
+            ZFileContentKt.getZFileConfig().setFilePath(TermuxConstants.TERMUX_HOME_DIR_PATH);
             getSupportFragmentManager().beginTransaction()
                 .replace(R.id.frame_file, ZFileListFragment.newInstance(), "ZFileListFragment")
                 .commitAllowingStateLoss();

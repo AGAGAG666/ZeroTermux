@@ -5,6 +5,7 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.graphics.Point;
 import android.os.CancellationSignal;
+import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract.Document;
 import android.provider.DocumentsContract.Root;
@@ -223,9 +224,16 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
      */
     private static File getFileForDocId(String docId) throws FileNotFoundException {
         if (docId == null || docId.isEmpty()) throw new FileNotFoundException("Empty document id");
-        final File f = new File(docId).getAbsoluteFile();
-        final String base = BASE_DIR.getAbsolutePath();
-        final String path = f.getPath();
+        String decoded = Uri.decode(docId);
+        final File f = new File(decoded).getAbsoluteFile();
+        final String base;
+        final String path;
+        try {
+            base = BASE_DIR.getCanonicalPath();
+            path = f.getCanonicalPath();
+        } catch (IOException e) {
+            throw new FileNotFoundException("Unable to resolve document id");
+        }
         if (!(path.equals(base) || path.startsWith(base + File.separator)))
             throw new FileNotFoundException(path + " is outside Termux home");
         if (!f.exists()) throw new FileNotFoundException(path + " not found");

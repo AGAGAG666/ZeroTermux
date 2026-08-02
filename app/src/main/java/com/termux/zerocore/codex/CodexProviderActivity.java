@@ -178,10 +178,12 @@ public class CodexProviderActivity extends AppCompatActivity {
         EditText baseUrl = field("Base URL", draft.baseUrl, false);
         EditText apiKey = field("API Key", draft.apiKey, true);
         EditText model = field("默认模型", draft.model, false);
+        Button fetchModels = new Button(this);
+        fetchModels.setText("获取上游模型");
         Spinner format = spinner(new String[]{"Responses", "Chat Completions", "Anthropic Messages"}, formatIndex(draft.apiFormat));
         CheckBox fullUrl = check("Base URL 是完整端点", draft.fullUrl);
         form.addView(label("基础配置")); form.addView(name); form.addView(baseUrl); form.addView(apiKey);
-        form.addView(model); form.addView(format); form.addView(fullUrl);
+        form.addView(model); form.addView(fetchModels); form.addView(format); form.addView(fullUrl);
 
         LinearLayout anthropicOptions = new LinearLayout(this);
         anthropicOptions.setOrientation(LinearLayout.VERTICAL);
@@ -233,6 +235,33 @@ public class CodexProviderActivity extends AppCompatActivity {
         form.addView(label("模型映射")); form.addView(mappings);
         form.addView(label("代理高级选项")); form.addView(userAgent); form.addView(headers); form.addView(body);
         form.addView(autoEndpoint); form.addView(alternateEndpoints); form.addView(failover); form.addView(priority);
+        fetchModels.setOnClickListener(v -> {
+            if (baseUrl.getText().toString().trim().isEmpty()) { baseUrl.setError("必填"); return; }
+            if (apiKey.getText().toString().trim().isEmpty()) { apiKey.setError("必填"); return; }
+            CodexProviderProfile pending = CcsJson.copy(draft);
+            pending.baseUrl = baseUrl.getText().toString().trim();
+            pending.apiKey = apiKey.getText().toString().trim();
+            pending.fullUrl = fullUrl.isChecked();
+            pending.customUserAgent = userAgent.getText().toString().trim();
+            fetchModels.setEnabled(false);
+            fetchModels.setText("获取中...");
+            CcsModelFetcher.fetch(pending, result -> runOnUiThread(() -> {
+                fetchModels.setEnabled(true);
+                fetchModels.setText("获取上游模型");
+                if (!result.success()) { showError("获取模型失败", new IllegalStateException(result.error)); return; }
+                List<CodexProviderProfile.ModelMapping> merged = parseMappings(mappings.getText().toString());
+                java.util.HashSet<String> existingModels = new java.util.HashSet<>();
+                for (CodexProviderProfile.ModelMapping item : merged) if (item != null && item.model != null) existingModels.add(item.model);
+                for (CcsModelFetcher.Model item : result.models) {
+                    if (TextUtils.isEmpty(item.id) || !existingModels.add(item.id)) continue;
+                    merged.add(new CodexProviderProfile.ModelMapping(item.id, item.id, 128000));
+                }
+                if (TextUtils.isEmpty(model.getText().toString().trim()) && !result.models.isEmpty())
+                    model.setText(result.models.get(0).id);
+                mappings.setText(mappingsText(merged));
+                Toast.makeText(this, "已获取 " + result.models.size() + " 个模型", Toast.LENGTH_SHORT).show();
+            }));
+        });
 
         ScrollView scroll = new ScrollView(this); scroll.addView(form);
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -336,8 +365,11 @@ public class CodexProviderActivity extends AppCompatActivity {
         return result;
     }
     private String mappingsText(CodexProviderProfile profile) {
+        return mappingsText(profile.modelCatalog);
+    }
+    private String mappingsText(List<CodexProviderProfile.ModelMapping> mappings) {
         StringBuilder result = new StringBuilder();
-        for (CodexProviderProfile.ModelMapping item : profile.modelCatalog) {
+        for (CodexProviderProfile.ModelMapping item : mappings) {
             if (item == null) continue;
             if (result.length() > 0) result.append('\n');
             result.append(item.displayName == null ? "" : item.displayName).append('|')
