@@ -882,16 +882,28 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         String title = conversation.getTitle().replace('|', ' ');
         if (title.length() > 32) title = title.substring(0, 32);
         createAndShowCodexSession(
-            new String[]{"resume", conversation.getId()},
+            "/system/bin/sh",
+            codexResumeArguments(conversation.getId()),
             conversation.getCwd(),
             "Codex|" + conversation.getId() + "|" + title,
             conversation.getId(), conversation.getTitle()
         );
     }
 
+    /** Run the wrapper through the Termux shell so its shebang and inherited PTY are handled consistently. */
+    private String[] codexResumeArguments(String conversationId) {
+        String executable = new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH, "codex").getAbsolutePath();
+        return new String[]{"-c", "exec " + shellQuote(executable) + " resume --all " + shellQuote(conversationId)};
+    }
+
+    private static String shellQuote(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
+    }
+
     private void openNewCodexConversation() {
         String pendingId = "new-" + System.currentTimeMillis();
         createAndShowCodexSession(
+            new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH, "codex").getAbsolutePath(),
             null,
             getCurrentSession() == null ? null : getCurrentSession().getCwd(),
             "Codex|" + pendingId + "|新对话",
@@ -899,14 +911,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         );
     }
 
-    private void createAndShowCodexSession(String[] arguments, String requestedCwd, String sessionName,
+    private void createAndShowCodexSession(String executablePath, String[] arguments, String requestedCwd, String sessionName,
                                            String conversationId, String conversationTitle) {
         TermuxService service = getTermuxService();
         if (service == null) {
             Toast.makeText(this, R.string.codex_resume_failed, Toast.LENGTH_SHORT).show();
             return;
         }
-        File executable = new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH, "codex");
+        File executable = new File(executablePath);
         if (!executable.canExecute()) {
             Toast.makeText(this, R.string.codex_not_installed, Toast.LENGTH_LONG).show();
             return;
@@ -930,10 +942,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void showTerminalSession(TerminalSession terminalSession) {
+        if (terminalSession == null) return;
+        indexSwitch(0);
         mTermuxTerminalSessionActivityClient.setCurrentSession(terminalSession);
-        if (getDrawer().isOpened()) {
-            getDrawer().smoothClose();
-        }
+        getDrawer().smoothClose();
         mTerminalView.requestFocus();
     }
 
@@ -2441,14 +2453,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             fragmentTransaction.commitNowAllowingStateLoss();
         } catch (Exception e) {
             LogUtils.e(TAG, "Error in commitNowAllowingStateLoss: " + e.getMessage());
-            // 如果 commitNow 失败，使用普通 commit
-            fragmentTransaction.commitAllowingStateLoss();
-            getSupportFragmentManager().executePendingTransactions();
+            return;
         }
 
         if (index == 0) {
             LogUtils.e(TAG, "fragmentManager switch ZFileListFragment. ");
-            fragmentTransaction.replace(R.id.frame_file, ZFileListFragment.newInstance(), "ZFileListFragment")
+            getSupportFragmentManager().beginTransaction()
+                .replace(R.id.frame_file, ZFileListFragment.newInstance(), "ZFileListFragment")
                 .commitAllowingStateLoss();
             LogUtils.e(TAG, "fragmentManager switch ZFileListFragment deno. ");
         }

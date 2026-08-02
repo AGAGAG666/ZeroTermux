@@ -53,7 +53,23 @@ public final class CodexSessionRegistry {
 
     public static synchronized TerminalSession findRunning(TermuxService service, String conversationId) {
         Binding binding = forConversation(conversationId);
-        return binding == null || service == null ? null : service.getTerminalSessionForHandle(binding.terminalHandle);
+        if (service == null || TextUtils.isEmpty(conversationId)) return null;
+        if (binding != null) {
+            TerminalSession session = service.getTerminalSessionForHandle(binding.terminalHandle);
+            if (session != null && session.isRunning()) return session;
+        }
+        // Recover bindings lost during an activity/process restart from the stable session title.
+        for (TermuxSession wrapped : service.getTermuxSessions()) {
+            TerminalSession session = wrapped.getTerminalSession();
+            if (session == null || !session.isRunning()) continue;
+            String name = session.mSessionName;
+            if (name != null && name.startsWith(DEDICATED_PREFIX)
+                && name.startsWith(DEDICATED_PREFIX + conversationId + "|")) {
+                bindDedicated(session, conversationId, "Codex", session.getCwd(), null, null);
+                return session;
+            }
+        }
+        return null;
     }
 
     public static synchronized void bindDedicated(TerminalSession session, String id, String title, String cwd,

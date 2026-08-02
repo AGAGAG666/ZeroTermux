@@ -90,7 +90,10 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
     public Cursor queryChildDocuments(String parentDocumentId, String[] projection, String sortOrder) throws FileNotFoundException {
         final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_DOCUMENT_PROJECTION);
         final File parent = getFileForDocId(parentDocumentId);
-        for (File file : parent.listFiles()) {
+        if (!parent.isDirectory()) throw new FileNotFoundException(parent.getAbsolutePath() + " is not a directory");
+        final File[] children = parent.listFiles();
+        if (children == null) return result;
+        for (File file : children) {
             includeFile(result, null, file);
         }
         return result;
@@ -117,10 +120,14 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
 
     @Override
     public String createDocument(String parentDocumentId, String mimeType, String displayName) throws FileNotFoundException {
-        File newFile = new File(parentDocumentId, displayName);
+        File parent = getFileForDocId(parentDocumentId);
+        if (!parent.isDirectory()) throw new FileNotFoundException(parent.getAbsolutePath() + " is not a directory");
+        if (displayName == null || displayName.isEmpty() || displayName.contains(File.separator))
+            throw new FileNotFoundException("Invalid display name");
+        File newFile = new File(parent, displayName);
         int noConflictId = 2;
         while (newFile.exists()) {
-            newFile = new File(parentDocumentId, displayName + " (" + noConflictId++ + ")");
+            newFile = new File(parent, displayName + " (" + noConflictId++ + ")");
         }
         try {
             boolean succeeded;
@@ -171,13 +178,17 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
             // through the whole SD card).
             boolean isInsideHome;
             try {
-                isInsideHome = file.getCanonicalPath().startsWith(TermuxConstants.TERMUX_HOME_DIR_PATH);
+                String canonicalPath = file.getCanonicalPath();
+                String canonicalHome = BASE_DIR.getCanonicalPath();
+                isInsideHome = canonicalPath.equals(canonicalHome)
+                    || canonicalPath.startsWith(canonicalHome + File.separator);
             } catch (IOException e) {
                 isInsideHome = true;
             }
             if (isInsideHome) {
                 if (file.isDirectory()) {
-                    Collections.addAll(pending, file.listFiles());
+                    File[] children = file.listFiles();
+                    if (children != null) Collections.addAll(pending, children);
                 } else {
                     if (file.getName().toLowerCase().contains(query)) {
                         includeFile(result, null, file);
@@ -191,7 +202,10 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
 
     @Override
     public boolean isChildDocument(String parentDocumentId, String documentId) {
-        return documentId.startsWith(parentDocumentId);
+        if (parentDocumentId == null || documentId == null) return false;
+        return documentId.equals(parentDocumentId)
+            || documentId.startsWith(parentDocumentId.endsWith(File.separator)
+                ? parentDocumentId : parentDocumentId + File.separator);
     }
 
     /**
@@ -208,8 +222,13 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
      * Get the file given a document id (the reverse of {@link #getDocIdForFile(File)}).
      */
     private static File getFileForDocId(String docId) throws FileNotFoundException {
-        final File f = new File(docId);
-        if (!f.exists()) throw new FileNotFoundException(f.getAbsolutePath() + " not found");
+        if (docId == null || docId.isEmpty()) throw new FileNotFoundException("Empty document id");
+        final File f = new File(docId).getAbsoluteFile();
+        final String base = BASE_DIR.getAbsolutePath();
+        final String path = f.getPath();
+        if (!(path.equals(base) || path.startsWith(base + File.separator)))
+            throw new FileNotFoundException(path + " is outside Termux home");
+        if (!f.exists()) throw new FileNotFoundException(path + " not found");
         return f;
     }
 
@@ -249,7 +268,8 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
         } else if (file.canWrite()) {
             flags |= Document.FLAG_SUPPORTS_WRITE;
         }
-        if (file.getParentFile().canWrite()) flags |= Document.FLAG_SUPPORTS_DELETE;
+        if (file.getParentFile() != null && file.getParentFile().canWrite())
+            flags |= Document.FLAG_SUPPORTS_DELETE;
 
         final String displayName = file.getName();
         final String mimeType = getMimeType(file);
