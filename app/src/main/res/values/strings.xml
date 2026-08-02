@@ -2019,4 +2019,39 @@ cd ~ &amp;&amp; pkg update -y \n
     <string name="zt_crash_history_not_found">Record not found or already deleted</string>
     <string name="zt_crash_history_thread">Thread: %1$s · Version: %2$s</string>
     <string name="zt_crash_history_detail_meta">Time: %1$s\nThread: %2$s\nVersion: %3$s\nException: %4$s\nMessage: %5$s</string>
+
+    <string name="codex_conversations">Codex conversations</string>
+    <string name="codex_refresh">Refresh</string>
+    <string name="codex_no_conversations">No Codex conversations yet. Run codex in the terminal to start one.</string>
+    <string name="codex_new_conversation">New conversation</string>
+    <string name="codex_providers">Providers</string>
+    <string name="codex_provider_short">Codex providers</string>
+    <string name="codex_provider_title">Codex provider switch</string>
+    <string name="codex_provider_back">Back</string>
+    <string name="codex_provider_add">Add</string>
+    <string name="codex_provider_help">Tap a provider to apply it to ~/.codex/config.toml. Long-press to edit or delete. Existing configuration is backed up once.</string>
+    <string name="codex_provider_name">Provider name</string>
+    <string name="codex_provider_base_url">Base URL, for example https://api.example.com/v1</string>
+    <string name="codex_provider_api_key">API key (optional for OAuth)</string>
+    <string name="codex_provider_model">Default model (optional)</string>
+    <string name="codex_provider_wire_api">API protocol</string>
+    <string name="codex_provider_save">Save</string>
+    <string name="codex_provider_required">Required</string>
+    <string name="codex_provider_edit">Edit provider</string>
+    <string name="codex_provider_delete">Delete provider</string>
+    <string name="codex_provider_delete_confirm">Delete %1$s?</string>
+    <string name="codex_provider_active">ACTIVE</string>
+    <string name="codex_provider_official_desc">OpenAI official login / API</string>
+    <string name="codex_provider_applied">Switched to %1$s. Restart Codex to apply.</string>
+    <string name="codex_provider_apply_failed">Could not apply provider</string>
+    <string name="codex_resume_failed">Could not resume this Codex conversation.</string>
+    <string name="codex_not_installed">Codex is not installed. Install DioNanos/codex-termux first.</string>
+    <string name="cc_switch_title">CC Switch</string>
+    <string name="cc_switch_subtitle">Codex provider management</string>
+    <string name="ccs_route">Route proxy</string>
+    <string name="ccs_usage">Usage</string>
+    <string name="ccs_presets">Presets</string>
+    <string name="ccs_import_export">Import / export</string>
+    <string name="ccs_settings">Settings</string>
+
 </resources>

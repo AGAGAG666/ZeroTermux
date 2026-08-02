@@ -1983,4 +1983,39 @@
     <string name="zt_crash_history_thread">线程: %1$s · 版本: %2$s</string>
     <string name="zt_crash_history_detail_meta">时间: %1$s\n线程: %2$s\n版本: %3$s\n异常: %4$s\n消息: %5$s</string>
 
+
+    <string name="codex_conversations">Codex 对话</string>
+    <string name="codex_refresh">刷新</string>
+    <string name="codex_no_conversations">暂无 Codex 对话。在终端输入 codex 即可新建。</string>
+    <string name="codex_new_conversation">新建对话</string>
+    <string name="codex_providers">供应商</string>
+    <string name="codex_provider_short">Codex 供应商</string>
+    <string name="codex_provider_title">Codex 供应商切换</string>
+    <string name="codex_provider_back">返回</string>
+    <string name="codex_provider_add">添加</string>
+    <string name="codex_provider_help">点击供应商即可写入 ~/.codex/config.toml 并切换；长按可编辑或删除。首次修改会自动备份原配置。</string>
+    <string name="codex_provider_name">供应商名称</string>
+    <string name="codex_provider_base_url">Base URL，例如 https://api.example.com/v1</string>
+    <string name="codex_provider_api_key">API Key（OAuth 可留空）</string>
+    <string name="codex_provider_model">默认模型（可选）</string>
+    <string name="codex_provider_wire_api">接口协议</string>
+    <string name="codex_provider_save">保存</string>
+    <string name="codex_provider_required">必填</string>
+    <string name="codex_provider_edit">编辑供应商</string>
+    <string name="codex_provider_delete">删除供应商</string>
+    <string name="codex_provider_delete_confirm">确定删除 %1$s？</string>
+    <string name="codex_provider_active">当前</string>
+    <string name="codex_provider_official_desc">OpenAI 官方登录 / API</string>
+    <string name="codex_provider_applied">已切换至 %1$s，重启 Codex 后生效。</string>
+    <string name="codex_provider_apply_failed">供应商切换失败</string>
+    <string name="codex_resume_failed">无法恢复此 Codex 对话。</string>
+    <string name="codex_not_installed">未安装 Codex，请先安装 DioNanos/codex-termux。</string>
+    <string name="cc_switch_title">CC Switch</string>
+    <string name="cc_switch_subtitle">Codex 供应商管理</string>
+    <string name="ccs_route">路由代理</string>
+    <string name="ccs_usage">使用统计</string>
+    <string name="ccs_presets">预设</string>
+    <string name="ccs_import_export">导入 / 导出</string>
+    <string name="ccs_settings">设置</string>
+
 </resources>

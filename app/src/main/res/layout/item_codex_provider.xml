@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
+    android:minHeight="72dp"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/codex_provider_item_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toStartOf="@+id/codex_provider_item_active"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/color_ffffff"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/codex_provider_item_active"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:background="#2E7D32"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="3dp"
+        android:text="@string/codex_provider_active"
+        android:textColor="@color/color_ffffff"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/codex_provider_item_endpoint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/codex_provider_item_name"
+        android:layout_marginTop="6dp"
+        android:layout_toStartOf="@id/codex_provider_item_active"
+        android:ellipsize="middle"
+        android:maxLines="1"
+        android:textColor="#AFFFFFFF"
+        android:textSize="12sp" />
+</RelativeLayout>

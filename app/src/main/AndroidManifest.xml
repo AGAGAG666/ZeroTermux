@@ -143,6 +143,15 @@
             android:exported="false"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
+        <activity android:name=".zerocore.codex.CodexProviderActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+
+        <service
+            android:name=".zerocore.codex.CcsProxyService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <activity android:name=".zerocore.ai.agent.ZtAgentAiSettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
