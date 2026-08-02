@@ -101,7 +101,6 @@ import com.termux.shared.termux.theme.TermuxThemeUtils;
 import com.termux.shared.theme.NightMode;
 import com.termux.shared.view.KeyboardUtils;
 import com.termux.shared.view.ViewUtils;
-import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
 import com.termux.view.TerminalRenderer;
@@ -115,13 +114,7 @@ import com.termux.zerocore.bean.ZDYDataBean;
 import com.termux.zerocore.bean.ZTUserBean;
 import com.termux.zerocore.broadcast.LocalReceiver;
 import com.termux.zerocore.code.CodeString;
-import com.termux.zerocore.codex.CodexProcessDetector;
 import com.termux.zerocore.codex.CodexProviderActivity;
-import com.termux.zerocore.codex.CodexSessionAdapter;
-import com.termux.zerocore.codex.CodexSessionInfo;
-import com.termux.zerocore.codex.CodexSessionRepository;
-import com.termux.zerocore.codex.CodexSessionRegistry;
-import com.termux.zerocore.codex.CodexProviderStore;
 import com.termux.zerocore.config.ZTConstantConfig;
 import com.termux.zerocore.config.mainmenu.MainMenuPackageInfo;
 import com.termux.zerocore.config.mainmenu.MainMenuPackageManager;
@@ -826,131 +819,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 		// @}
     }
 
-    private void setupCodexControls() {
-        CodexProviderStore.ensureProxyRunning(this);
-        mCodexSessionAdapter = new CodexSessionAdapter(this);
-        codex_sessions_list.setAdapter(mCodexSessionAdapter);
-        codex_sessions_list.setOnItemClickListener((parent, view, position, id) ->
-            openCodexConversation(mCodexSessionAdapter.getItem(position)));
-        findViewById(R.id.codex_sessions_button).setOnClickListener(view -> showCodexSessionsPanel());
-        findViewById(R.id.codex_refresh_button).setOnClickListener(view -> refreshCodexSessions());
-        findViewById(R.id.codex_new_conversation_button).setOnClickListener(view -> openNewCodexConversation());
-        View.OnClickListener providerListener = view ->
-            startActivity(new Intent(TermuxActivity.this, CodexProviderActivity.class));
-        findViewById(R.id.codex_provider_button).setOnClickListener(providerListener);
-        findViewById(R.id.codex_provider_page_button).setOnClickListener(providerListener);
-    }
-
-    private void showCodexSessionsPanel() {
-        if (mAiAgentPanelHelper != null) {
-            mAiAgentPanelHelper.setPanelTabVisible(false);
-        }
-        frame_file.setVisibility(View.INVISIBLE);
-        session_rl.setVisibility(View.INVISIBLE);
-        codex_sessions_panel.setVisibility(View.VISIBLE);
-        refreshCodexSessions();
-        if (!getDrawer().isOpened()) {
-            getDrawer().smoothRightOpen();
-        }
-    }
-
-    private void hideCodexSessionsPanel() {
-        if (codex_sessions_panel != null) {
-            codex_sessions_panel.setVisibility(View.GONE);
-        }
-    }
-
-    private void refreshCodexSessions() {
-        if (CodexSessionRegistry.reconcile(getTermuxService())) termuxSessionListNotifyUpdated();
-        UUtils.runOnThread(() -> {
-            List<CodexSessionInfo> sessions = CodexSessionRepository.loadSessions();
-            UUtils.runOnUIThread(() -> {
-                if (isFinishing() || mCodexSessionAdapter == null) return;
-                mCodexSessionAdapter.replace(sessions);
-                boolean empty = sessions.isEmpty();
-                codex_empty_view.setVisibility(empty ? View.VISIBLE : View.GONE);
-                codex_sessions_list.setVisibility(empty ? View.GONE : View.VISIBLE);
-            });
-        });
-    }
-
-    private void openCodexConversation(CodexSessionInfo conversation) {
-        TerminalSession existing = CodexSessionRegistry.findRunning(getTermuxService(), conversation.getId());
-        if (existing != null) {
-            showTerminalSession(existing);
-            return;
-        }
-        String title = conversation.getTitle().replace('|', ' ');
-        if (title.length() > 32) title = title.substring(0, 32);
-        createAndShowCodexSession(
-            "/system/bin/sh",
-            codexResumeArguments(conversation.getId()),
-            conversation.getCwd(),
-            "Codex|" + conversation.getId() + "|" + title,
-            conversation.getId(), conversation.getTitle()
-        );
-    }
-
-    /** Run the wrapper through the Termux shell so its shebang and inherited PTY are handled consistently. */
-    private String[] codexResumeArguments(String conversationId) {
-        String executable = new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH, "codex").getAbsolutePath();
-        return new String[]{"-c", "exec " + shellQuote(executable) + " resume --all " + shellQuote(conversationId)};
-    }
-
-    private static String shellQuote(String value) {
-        return "'" + value.replace("'", "'\\''") + "'";
-    }
-
-    private void openNewCodexConversation() {
-        String pendingId = "new-" + System.currentTimeMillis();
-        createAndShowCodexSession(
-            new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH, "codex").getAbsolutePath(),
-            null,
-            getCurrentSession() == null ? null : getCurrentSession().getCwd(),
-            "Codex|" + pendingId + "|新对话",
-            pendingId, "新对话"
-        );
-    }
-
-    private void createAndShowCodexSession(String executablePath, String[] arguments, String requestedCwd, String sessionName,
-                                           String conversationId, String conversationTitle) {
-        TermuxService service = getTermuxService();
-        if (service == null) {
-            Toast.makeText(this, R.string.codex_resume_failed, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        File executable = new File(executablePath);
-        if (!executable.canExecute()) {
-            Toast.makeText(this, R.string.codex_not_installed, Toast.LENGTH_LONG).show();
-            return;
-        }
-        String workingDirectory = requestedCwd;
-        if (TextUtils.isEmpty(workingDirectory) || !new File(workingDirectory).isDirectory()) {
-            workingDirectory = TermuxConstants.TERMUX_HOME_DIR_PATH;
-        }
-        TerminalSession previous = getCurrentSession();
-        TermuxSession created = service.createTermuxSession(
-            executable.getAbsolutePath(), arguments, null, workingDirectory, false, sessionName);
-        if (created == null) {
-            Toast.makeText(this, R.string.codex_resume_failed, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        TerminalSession terminal = created.getTerminalSession();
-        if (!TextUtils.isEmpty(conversationId)) CodexSessionRegistry.bindDedicated(terminal, conversationId,
-            conversationTitle, workingDirectory, previous == null ? null : previous.mHandle,
-            CodexProviderStore.activeId(this));
-        showTerminalSession(terminal);
-    }
-
-    private void showTerminalSession(TerminalSession terminalSession) {
-        if (terminalSession == null) return;
-        indexSwitch(0);
-        mTermuxTerminalSessionActivityClient.setCurrentSession(terminalSession);
-        getDrawer().smoothClose();
-        mTerminalView.requestFocus();
-    }
-
-
     @SuppressLint("RtlHardcoded")
     @Override
     public void onBackPressed() {
@@ -1547,10 +1415,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private MainActivity mMainActivity;
     private FrameLayout frame_file;
     private RelativeLayout session_rl;
-    private LinearLayout codex_sessions_panel;
-    private ListView codex_sessions_list;
-    private TextView codex_empty_view;
-    private CodexSessionAdapter mCodexSessionAdapter;
     private RelativeLayout mGuideLayout;
     private RecyclerView mMainMenuList;
     private RecyclerView mMenuPackageList;
@@ -1586,9 +1450,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         info_card = findViewById(R.id.info_card);
         frame_file = findViewById(R.id.frame_file);
         session_rl = findViewById(R.id.session_rl);
-        codex_sessions_panel = findViewById(R.id.codex_sessions_panel);
-        codex_sessions_list = findViewById(R.id.codex_sessions_list);
-        codex_empty_view = findViewById(R.id.codex_empty_view);
         telegram_group_tv = findViewById(R.id.telegram_group_tv);
         qq_group_tv = findViewById(R.id.qq_group_tv);
         version = findViewById(R.id.version);
@@ -1665,7 +1526,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         });
         initDataMsgInfo();
         setEgInstallStatus();
-        setupCodexControls();
         findViewById(R.id.cc_switch_button).setOnClickListener(v -> {
             if (getDrawer().isOpened()) getDrawer().smoothClose();
             startActivity(new Intent(TermuxActivity.this, CodexProviderActivity.class));
@@ -1692,7 +1552,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private void prepareAiAgentTabInDrawer() {
         frame_file.setVisibility(View.INVISIBLE);
         session_rl.setVisibility(View.INVISIBLE);
-        hideCodexSessionsPanel();
         if (!getDrawer().isOpened()) {
             getDrawer().smoothRightOpen();
         }
@@ -1718,10 +1577,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private void openRightSideOrAiPanel() {
         if (getDrawer().isOpened()) {
             getDrawer().smoothClose();
-            return;
-        }
-        if (CodexProcessDetector.isCodexRunning(getCurrentSession())) {
-            showCodexSessionsPanel();
             return;
         }
         if (mAiAgentPanelHelper != null) {
@@ -2408,7 +2263,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         frame_file.setVisibility(View.INVISIBLE);
         session_rl.setVisibility(View.INVISIBLE);
-        hideCodexSessionsPanel();
         switch (index) {
             case 0:
                 frame_file.setVisibility(View.VISIBLE);
@@ -2989,9 +2843,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             public void onSwipeOpened(SmartSwipeWrapper wrapper, SwipeConsumer consumer, int direction) {
                 super.onSwipeOpened(wrapper, consumer, direction);
                 updateDrawerOpenProgress(1f, true);
-                if (wrapper == rightHorizontalMenuWrapper && CodexProcessDetector.isCodexRunning(getCurrentSession())) {
-                    showCodexSessionsPanel();
-                }
                 mTerminalView.clearFocus();
                 if (!UserSetManage.Companion.get().getZTUserBean().isHideGuideLayout()) {
                     mGuideLayout.setVisibility(View.GONE);

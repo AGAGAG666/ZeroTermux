@@ -23,6 +23,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 
 import com.termux.R;
+import com.termux.app.terminal.TerminalTitleNotificationSettings;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,10 +40,15 @@ public class CodexProviderActivity extends AppCompatActivity {
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_codex_provider);
+        CodexProviderStore.ensureProxyRunning(this);
         findViewById(R.id.codex_provider_back).setOnClickListener(v -> finish());
         findViewById(R.id.codex_provider_add).setOnClickListener(v -> editProvider(null));
         agentTitle = findViewById(R.id.ccs_agent_title);
         proxyStatus = findViewById(R.id.ccs_proxy_status);
+        SwitchCompat backgroundTitleSwitch = findViewById(R.id.ccs_background_title_switch);
+        backgroundTitleSwitch.setChecked(TerminalTitleNotificationSettings.isEnabled(this));
+        backgroundTitleSwitch.setOnCheckedChangeListener((button, checked) ->
+            TerminalTitleNotificationSettings.setEnabled(this, checked));
         routeSwitch = findViewById(R.id.ccs_route_switch);
         routeSwitch.setChecked(CodexProviderStore.isRouteEnabled(this));
         routeSwitch.setOnCheckedChangeListener((button, checked) -> toggleRoute(checked));
@@ -108,7 +114,10 @@ public class CodexProviderActivity extends AppCompatActivity {
         try {
             CodexProviderStore.apply(this, agent, profile);
             adapter.notifyDataSetChanged();
-            Toast.makeText(this, getString(R.string.codex_provider_applied, profile.name), Toast.LENGTH_LONG).show();
+            String message = CodexProviderStore.isRouteEnabled(this)
+                ? profile.name + " 已切换，后续请求立即使用新渠道"
+                : profile.name + " 已切换，重新启动 Agent 后生效";
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
         } catch (Exception error) {
             showError(getString(R.string.codex_provider_apply_failed), error);
         }
@@ -299,6 +308,9 @@ public class CodexProviderActivity extends AppCompatActivity {
                 if (adding) providers.add(draft);
                 else providers.set(providers.indexOf(existing), draft);
                 CodexProviderStore.save(this, agent, providers);
+                if (draft.id.equals(CodexProviderStore.activeId(this, agent))) {
+                    CodexProviderStore.apply(this, agent, draft);
+                }
                 dialog.dismiss();
                 adapter.notifyDataSetChanged();
             } catch (Exception error) { showError("配置无效", error); }
@@ -333,7 +345,9 @@ public class CodexProviderActivity extends AppCompatActivity {
     private void showSettings() {
         new AlertDialog.Builder(this).setTitle("CC Switch 设置")
             .setMessage("代理端口：" + CodexProviderStore.proxyPort() +
-                "\nCodex model_provider：custom\n供应商密钥：兼容 CCS 的明文存储\n供应商切换：下次启动或恢复生效")
+                "\nCodex model_provider：custom\n供应商密钥：兼容 CCS 的明文存储" +
+                "\n路由开启：切换渠道后续请求立即生效" +
+                "\n路由关闭：重新启动 Codex/OpenCode 后生效，无需重启 Termux")
             .setPositiveButton(android.R.string.ok, null).show();
     }
 

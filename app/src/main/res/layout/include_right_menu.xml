@@ -82,78 +82,6 @@
                 </LinearLayout>
             </RelativeLayout>
 
-            <LinearLayout
-                android:id="@+id/codex_sessions_panel"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="6dp">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/codex_conversations"
-                        android:textColor="@color/color_ffffff"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-                    <Button
-                        android:id="@+id/codex_refresh_button"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:text="@string/codex_refresh"
-                        android:textColor="@color/color_ffffff" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/codex_empty_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:padding="24dp"
-                    android:text="@string/codex_no_conversations"
-                    android:textColor="#99FFFFFF" />
-
-                <ListView
-                    android:id="@+id/codex_sessions_list"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:divider="#22FFFFFF"
-                    android:dividerHeight="1dp"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-                    <Button
-                        android:id="@+id/codex_new_conversation_button"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/codex_new_conversation"
-                        android:textColor="@color/color_ffffff" />
-                    <Button
-                        android:id="@+id/codex_provider_button"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/codex_providers"
-                        android:textColor="@color/color_ffffff" />
-                </LinearLayout>
-            </LinearLayout>
         </RelativeLayout>
 
         <androidx.cardview.widget.CardView
@@ -196,28 +124,6 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="AI"
-                        android:textColor="@color/color_ffffff" />
-                </LinearLayout>
-                <LinearLayout
-                    style="?android:attr/buttonBarStyle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-                    <Button
-                        android:id="@+id/codex_sessions_button"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Codex"
-                        android:textColor="@color/color_ffffff" />
-                    <Button
-                        android:id="@+id/codex_provider_page_button"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/codex_provider_short"
                         android:textColor="@color/color_ffffff" />
                 </LinearLayout>
             </LinearLayout>

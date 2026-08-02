@@ -24,7 +24,6 @@ import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
 import com.termux.shared.theme.NightMode;
 import com.termux.shared.theme.ThemeUtils;
 import com.termux.terminal.TerminalSession;
-import com.termux.zerocore.codex.CodexSessionRegistry;
 
 import java.util.List;
 
@@ -38,26 +37,6 @@ public class TermuxSessionsListViewController extends ArrayAdapter<TermuxSession
     public TermuxSessionsListViewController(TermuxActivity activity, List<TermuxSession> sessionList) {
         super(activity.getApplicationContext(), R.layout.item_terminal_sessions_list, sessionList);
         this.mActivity = activity;
-    }
-
-    @Override public int getCount() {
-        int count = 0;
-        for (int i = 0; i < super.getCount(); i++) if (!isHidden(super.getItem(i))) count++;
-        return count;
-    }
-
-    @Override public TermuxSession getItem(int position) {
-        int visible = 0;
-        for (int i = 0; i < super.getCount(); i++) {
-            TermuxSession item = super.getItem(i);
-            if (isHidden(item)) continue;
-            if (visible++ == position) return item;
-        }
-        return null;
-    }
-
-    private boolean isHidden(TermuxSession item) {
-        return item != null && CodexSessionRegistry.isCodexTerminal(item.getTerminalSession());
     }
 
     @SuppressLint("SetTextI18n")

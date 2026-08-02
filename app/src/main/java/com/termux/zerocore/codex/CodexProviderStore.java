@@ -111,12 +111,10 @@ public final class CodexProviderStore {
         if (TextUtils.isEmpty(profile.name) || TextUtils.isEmpty(profile.baseUrl))
             throw new IllegalArgumentException("供应商名称和 Base URL 必填");
         if (CodexProviderProfile.AGENT_OPENCODE.equals(agent)) writeOpenCodeConfig(context, profile);
-        else {
-            CodexHistoryMigrator.migrateToCustom();
-            writeCodexConfig(context, profile);
-        }
+        else writeCodexConfig(context, profile);
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(activeKey(agent), profile.id).commit();
+        ensureProxyRunning(context);
     }
 
     public static void apply(Context context, CodexProviderProfile profile) throws Exception {

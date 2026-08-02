@@ -45,6 +45,15 @@
         android:textColor="#B3FFFFFF"
         android:textSize="12sp" />
 
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/ccs_background_title_switch"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="#22262B"
+        android:paddingHorizontal="14dp"
+        android:text="后台任务标题提示"
+        android:textColor="@color/color_ffffff" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="48dp"

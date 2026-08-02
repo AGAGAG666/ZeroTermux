@@ -29,7 +29,6 @@ import com.termux.shared.termux.terminal.io.BellHandler;
 import com.termux.shared.logger.Logger;
 import com.termux.terminal.TerminalColors;
 import com.termux.terminal.TerminalSession;
-import com.termux.zerocore.codex.CodexSessionRegistry;
 // ZeroTermux add {@
 import com.termux.zerocore.editor.EditorTerminalSessionRelay;
 //@}
@@ -120,9 +119,6 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
 
     @Override
     public void onTextChanged(@NonNull TerminalSession changedSession) {
-        if (CodexSessionRegistry.reconcile(mActivity.getTermuxService())) {
-            termuxSessionListNotifyUpdated();
-        }
         // ZeroTermux modify {@
         // if (!mActivity.isVisible()) return;
         if (!mActivity.isVisible()) {
@@ -143,7 +139,8 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
     public void onTitleChanged(@NonNull TerminalSession updatedSession) {
         if (!mActivity.isVisible()) return;
 
-        if (updatedSession != mActivity.getCurrentSession()) {
+        if (updatedSession != mActivity.getCurrentSession()
+            && TerminalTitleNotificationSettings.isEnabled(mActivity)) {
             // Only show toast for other sessions than the current one, since the user
             // probably consciously caused the title change to change in the current session
             // and don't want an annoying toast for that.
@@ -164,11 +161,6 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         }
 
         int index = service.getIndexOfSession(finishedSession);
-        boolean dedicatedCodex = CodexSessionRegistry.isCodexTerminal(finishedSession)
-            && !TextUtils.isEmpty(finishedSession.mSessionName)
-            && finishedSession.mSessionName.startsWith(CodexSessionRegistry.DEDICATED_PREFIX);
-        String previousCodexHandle = CodexSessionRegistry.onFinished(finishedSession);
-
         // For plugin commands that expect the result back, we should immediately close the session
         // and send the result back instead of waiting fo the user to press enter.
         // The plugin can handle/show errors itself.
@@ -196,12 +188,8 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         } else {
             // Once we have a separate launcher icon for the failsafe session, it
             // should be safe to auto-close session on exit code '0' or '130'.
-            if (dedicatedCodex || finishedSession.getExitStatus() == 0 || finishedSession.getExitStatus() == 130 || isPluginExecutionCommandWithPendingResult) {
+            if (finishedSession.getExitStatus() == 0 || finishedSession.getExitStatus() == 130 || isPluginExecutionCommandWithPendingResult) {
                 removeFinishedSession(finishedSession);
-                if (dedicatedCodex && previousCodexHandle != null) {
-                    TerminalSession previous = service.getTerminalSessionForHandle(previousCodexHandle);
-                    if (previous != null) setCurrentSession(previous);
-                }
             }
         }
     }
