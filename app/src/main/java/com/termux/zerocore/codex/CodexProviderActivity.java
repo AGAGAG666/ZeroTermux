@@ -183,14 +183,20 @@ public class CodexProviderActivity extends AppCompatActivity {
         form.addView(label("基础配置")); form.addView(name); form.addView(baseUrl); form.addView(apiKey);
         form.addView(model); form.addView(format); form.addView(fullUrl);
 
+        LinearLayout anthropicOptions = new LinearLayout(this);
+        anthropicOptions.setOrientation(LinearLayout.VERTICAL);
         Spinner authField = spinner(new String[]{"ANTHROPIC_AUTH_TOKEN (Authorization Bearer)", "ANTHROPIC_API_KEY (x-api-key)"},
             "ANTHROPIC_API_KEY".equals(draft.anthropicAuthField) ? 1 : 0);
         CheckBox impersonate = check("模拟 Claude Code 客户端", draft.impersonateClaudeCode);
         EditText maxTokens = field("Anthropic 最大输出 tokens（留空=8192）",
             draft.maxOutputTokens > 0 ? String.valueOf(draft.maxOutputTokens) : "", false);
         maxTokens.setInputType(InputType.TYPE_CLASS_NUMBER);
-        form.addView(label("Anthropic")); form.addView(authField); form.addView(impersonate); form.addView(maxTokens);
+        anthropicOptions.addView(label("Anthropic")); anthropicOptions.addView(authField);
+        anthropicOptions.addView(impersonate); anthropicOptions.addView(maxTokens);
+        form.addView(anthropicOptions);
 
+        LinearLayout chatOptions = new LinearLayout(this);
+        chatOptions.setOrientation(LinearLayout.VERTICAL);
         Spinner cache = spinner(new String[]{"提示词缓存：自动", "提示词缓存：开启", "提示词缓存：关闭"},
             "enabled".equals(draft.promptCacheRouting) ? 1 : "disabled".equals(draft.promptCacheRouting) ? 2 : 0);
         CheckBox thinking = check("支持思考模式", draft.supportsThinking);
@@ -200,7 +206,20 @@ public class CodexProviderActivity extends AppCompatActivity {
         Spinner effortParam = spinner(new String[]{"reasoning_effort", "reasoning.effort"},
             "reasoning.effort".equals(draft.effortParam) ? 1 : 0);
         effort.setOnCheckedChangeListener((button, checked) -> { if (checked) thinking.setChecked(true); });
-        form.addView(label("Chat 思考与缓存")); form.addView(cache); form.addView(thinking); form.addView(thinkingParam); form.addView(effort); form.addView(effortParam);
+        chatOptions.addView(label("Chat 思考与缓存")); chatOptions.addView(cache); chatOptions.addView(thinking);
+        chatOptions.addView(thinkingParam); chatOptions.addView(effort); chatOptions.addView(effortParam);
+        form.addView(chatOptions);
+        format.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                String selected = formatValue(position);
+                anthropicOptions.setVisibility(CodexProviderProfile.FORMAT_ANTHROPIC.equals(selected) ? View.VISIBLE : View.GONE);
+                chatOptions.setVisibility(CodexProviderProfile.FORMAT_CHAT.equals(selected) ? View.VISIBLE : View.GONE);
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {
+                anthropicOptions.setVisibility(View.GONE);
+                chatOptions.setVisibility(View.GONE);
+            }
+        });
 
         EditText mappings = multiline("每行：菜单显示名|实际请求模型|上下文窗口", mappingsText(draft));
         EditText userAgent = field("自定义 User-Agent", draft.customUserAgent, false);
