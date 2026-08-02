@@ -826,6 +826,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setupCodexControls() {
+        CodexProviderStore.ensureProxyRunning(this);
         mCodexSessionAdapter = new CodexSessionAdapter(this);
         codex_sessions_list.setAdapter(mCodexSessionAdapter);
         codex_sessions_list.setOnItemClickListener((parent, view, position, id) ->

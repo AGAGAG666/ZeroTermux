@@ -96,6 +96,11 @@ public final class CodexProviderStore {
         reapplyActive(context, CodexProviderProfile.AGENT_OPENCODE);
     }
 
+    public static void ensureProxyRunning(Context context) {
+        if (isRouteEnabled(context)) ContextCompat.startForegroundService(context,
+            new Intent(context, CcsProxyService.class).setAction(CcsProxyService.ACTION_START));
+    }
+
     public static void reapplyActive(Context context, String agent) throws Exception {
         CodexProviderProfile active = active(context, agent);
         if (active != null) apply(context, agent, active);
@@ -200,17 +205,24 @@ public final class CodexProviderStore {
         JsonObject root = new JsonObject();
         root.addProperty("version", 1);
         root.addProperty("routeEnabled", isRouteEnabled(context));
+        root.addProperty("activeCodex", activeId(context, CodexProviderProfile.AGENT_CODEX));
+        root.addProperty("activeOpenCode", activeId(context, CodexProviderProfile.AGENT_OPENCODE));
         root.add("codex", GSON.toJsonTree(load(context, CodexProviderProfile.AGENT_CODEX)));
         root.add("opencode", GSON.toJsonTree(load(context, CodexProviderProfile.AGENT_OPENCODE)));
         return GSON.toJson(root);
     }
 
-    public static void importJson(Context context, String json) {
+    public static void importJson(Context context, String json) throws Exception {
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         List<CodexProviderProfile> codex = GSON.fromJson(root.get("codex"), new TypeToken<List<CodexProviderProfile>>() {}.getType());
         List<CodexProviderProfile> opencode = GSON.fromJson(root.get("opencode"), new TypeToken<List<CodexProviderProfile>>() {}.getType());
         save(context, CodexProviderProfile.AGENT_CODEX, codex == null ? new ArrayList<>() : codex);
         save(context, CodexProviderProfile.AGENT_OPENCODE, opencode == null ? new ArrayList<>() : opencode);
+        SharedPreferences.Editor editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
+        if (root.has("activeCodex")) editor.putString(activeKey(CodexProviderProfile.AGENT_CODEX), root.get("activeCodex").getAsString());
+        if (root.has("activeOpenCode")) editor.putString(activeKey(CodexProviderProfile.AGENT_OPENCODE), root.get("activeOpenCode").getAsString());
+        editor.commit();
+        if (root.has("routeEnabled")) setRouteEnabled(context, root.get("routeEnabled").getAsBoolean());
     }
 
     public static int proxyPort() { return PROXY_PORT; }
