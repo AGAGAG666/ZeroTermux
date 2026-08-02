@@ -88,7 +88,6 @@ public final class CcsProxyEngine extends NanoHTTPD {
                     if (wantsStream) return newFixedLengthResponse(Status.OK, "text/event-stream; charset=utf-8",
                         CcsProtocolBridge.syntheticStream(agent, converted));
                     return json(Status.OK, converted);
-                }
                 } catch (Exception e) {
                     lastError = provider.name + " (" + endpoint + "): " + e.getClass().getSimpleName() + ": " + e.getMessage();
                     CcsUsageStore.record(agent, provider.id, model(incoming), false,
