@@ -96,7 +96,7 @@ public final class CcsProxyEngine extends NanoHTTPD {
                 }
             }
         }
-        return json(Status.BAD_GATEWAY, error(lastError));
+        return json(Status.SERVICE_UNAVAILABLE, error(lastError));
     }
 
     private List<CodexProviderProfile> candidates(String agent) {
