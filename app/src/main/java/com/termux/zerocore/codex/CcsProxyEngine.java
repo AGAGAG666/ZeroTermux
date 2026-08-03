@@ -166,7 +166,7 @@ public final class CcsProxyEngine extends NanoHTTPD {
         try { return body.get("model").getAsString(); } catch (Exception ignored) { return ""; }
     }
 
-    private static JsonObject parseUpstream(CodexProviderProfile provider, String raw) {
+    static JsonObject parseUpstream(CodexProviderProfile provider, String raw) {
         String value = raw == null ? "" : raw.trim();
         if (!value.isEmpty() && value.startsWith("{"))
             return JsonParser.parseString(value).getAsJsonObject();
@@ -239,6 +239,11 @@ public final class CcsProxyEngine extends NanoHTTPD {
 
     private static String string(JsonObject object, String key) {
         return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : null;
+    }
+
+    private static String string(JsonObject object, String key, String fallback) {
+        String value = string(object, key);
+        return value == null ? fallback : value;
     }
 
     private static JsonObject error(String message) {

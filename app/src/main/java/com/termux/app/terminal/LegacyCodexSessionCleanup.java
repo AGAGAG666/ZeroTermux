@@ -39,7 +39,9 @@ public final class LegacyCodexSessionCleanup {
         for (com.termux.shared.termux.shell.command.runner.terminal.TermuxSession wrapped : service.getTermuxSessions()) {
             TerminalSession session = wrapped.getTerminalSession();
             if (session == null || !isLegacyName(session.mSessionName)) continue;
-            session.mSessionName = originalNames.get(session.mHandle);
+            String originalName = originalNames.get(session.mHandle);
+            session.mSessionName = originalName;
+            wrapped.getExecutionCommand().shellName = originalName;
         }
         if (state.exists()) state.delete();
     }

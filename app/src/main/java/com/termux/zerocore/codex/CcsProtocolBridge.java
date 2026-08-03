@@ -261,15 +261,24 @@ final class CcsProtocolBridge {
     private static String responsesSse(JsonObject response) {
         String id = string(response, "id", "resp_" + UUID.randomUUID()); String text = responsesText(response);
         JsonObject created = new JsonObject(); created.addProperty("type", "response.created"); JsonObject shell = new JsonObject(); shell.addProperty("id", id); shell.addProperty("status", "in_progress"); shell.addProperty("object", "response"); created.add("response", shell);
-        JsonObject item = new JsonObject(); item.addProperty("id", "msg_" + UUID.randomUUID()); item.addProperty("type", "message"); item.addProperty("role", "assistant");
+        String itemId = "msg_" + UUID.randomUUID();
+        JsonObject pendingItem = new JsonObject(); pendingItem.addProperty("id", itemId); pendingItem.addProperty("type", "message"); pendingItem.addProperty("role", "assistant"); pendingItem.addProperty("status", "in_progress"); pendingItem.add("content", new JsonArray());
+        JsonObject itemAdded = new JsonObject(); itemAdded.addProperty("type", "response.output_item.added"); itemAdded.addProperty("output_index", 0); itemAdded.add("item", pendingItem);
+        JsonObject pendingPart = new JsonObject(); pendingPart.addProperty("type", "output_text"); pendingPart.addProperty("text", ""); pendingPart.add("annotations", new JsonArray());
+        JsonObject partAdded = new JsonObject(); partAdded.addProperty("type", "response.content_part.added"); partAdded.addProperty("item_id", itemId); partAdded.addProperty("output_index", 0); partAdded.addProperty("content_index", 0); partAdded.add("part", pendingPart);
+        JsonObject item = new JsonObject(); item.addProperty("id", itemId); item.addProperty("type", "message"); item.addProperty("role", "assistant"); item.addProperty("status", "completed");
         JsonArray itemContent = new JsonArray(); JsonObject itemText = new JsonObject(); itemText.addProperty("type", "output_text"); itemText.addProperty("text", text); itemText.add("annotations", new JsonArray()); itemContent.add(itemText); item.add("content", itemContent);
-        JsonObject itemDone = new JsonObject(); itemDone.addProperty("type", "response.output_item.done"); itemDone.add("item", item);
-        JsonObject delta = new JsonObject(); delta.addProperty("type", "response.output_text.delta"); delta.addProperty("output_index", 0); delta.addProperty("content_index", 0); delta.addProperty("delta", text);
-        JsonObject textDone = new JsonObject(); textDone.addProperty("type", "response.output_text.done"); textDone.addProperty("output_index", 0); textDone.addProperty("content_index", 0); textDone.addProperty("text", text);
+        JsonObject delta = new JsonObject(); delta.addProperty("type", "response.output_text.delta"); delta.addProperty("item_id", itemId); delta.addProperty("output_index", 0); delta.addProperty("content_index", 0); delta.addProperty("delta", text);
+        JsonObject textDone = new JsonObject(); textDone.addProperty("type", "response.output_text.done"); textDone.addProperty("item_id", itemId); textDone.addProperty("output_index", 0); textDone.addProperty("content_index", 0); textDone.addProperty("text", text);
+        JsonObject partDone = new JsonObject(); partDone.addProperty("type", "response.content_part.done"); partDone.addProperty("item_id", itemId); partDone.addProperty("output_index", 0); partDone.addProperty("content_index", 0); partDone.add("part", itemText);
+        JsonObject itemDone = new JsonObject(); itemDone.addProperty("type", "response.output_item.done"); itemDone.addProperty("output_index", 0); itemDone.add("item", item);
         JsonObject completed = new JsonObject(); completed.addProperty("type", "response.completed"); completed.add("response", response);
         return "event: response.created\ndata: " + created + "\n\n"
+            + "event: response.output_item.added\ndata: " + itemAdded + "\n\n"
+            + "event: response.content_part.added\ndata: " + partAdded + "\n\n"
             + "event: response.output_text.delta\ndata: " + delta + "\n\n"
             + "event: response.output_text.done\ndata: " + textDone + "\n\n"
+            + "event: response.content_part.done\ndata: " + partDone + "\n\n"
             + "event: response.output_item.done\ndata: " + itemDone + "\n\n"
             + "event: response.completed\ndata: " + completed + "\n\n";
     }
