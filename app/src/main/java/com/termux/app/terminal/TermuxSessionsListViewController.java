@@ -66,11 +66,11 @@ public class TermuxSessionsListViewController extends ArrayAdapter<TermuxSession
         }
 
         String name = sessionAtRow.mSessionName;
+        String sessionTitle = sessionAtRow.getTitle();
+
         String numberPart = "[" + (position + 1) + "] ";
         String sessionNamePart = (TextUtils.isEmpty(name) ? "" : name);
-        String cwd = sessionAtRow.getCwd();
-        String sessionTitle = (TextUtils.isEmpty(cwd) ? "" : cwd + " · ") + sessionAtRow.mHandle;
-        String sessionTitlePart = (sessionNamePart.isEmpty() ? "" : "\n") + sessionTitle;
+        String sessionTitlePart = (TextUtils.isEmpty(sessionTitle) ? "" : ((sessionNamePart.isEmpty() ? "" : "\n") + sessionTitle));
 
         String fullSessionTitle = numberPart + sessionNamePart + sessionTitlePart;
         SpannableString fullSessionTitleStyled = new SpannableString(fullSessionTitle);
