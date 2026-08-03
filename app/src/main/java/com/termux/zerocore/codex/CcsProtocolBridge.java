@@ -261,9 +261,17 @@ final class CcsProtocolBridge {
     private static String responsesSse(JsonObject response) {
         String id = string(response, "id", "resp_" + UUID.randomUUID()); String text = responsesText(response);
         JsonObject created = new JsonObject(); created.addProperty("type", "response.created"); JsonObject shell = new JsonObject(); shell.addProperty("id", id); shell.addProperty("status", "in_progress"); shell.addProperty("object", "response"); created.add("response", shell);
+        JsonObject item = new JsonObject(); item.addProperty("id", "msg_" + UUID.randomUUID()); item.addProperty("type", "message"); item.addProperty("role", "assistant");
+        JsonArray itemContent = new JsonArray(); JsonObject itemText = new JsonObject(); itemText.addProperty("type", "output_text"); itemText.addProperty("text", text); itemText.add("annotations", new JsonArray()); itemContent.add(itemText); item.add("content", itemContent);
+        JsonObject itemDone = new JsonObject(); itemDone.addProperty("type", "response.output_item.done"); itemDone.add("item", item);
         JsonObject delta = new JsonObject(); delta.addProperty("type", "response.output_text.delta"); delta.addProperty("output_index", 0); delta.addProperty("content_index", 0); delta.addProperty("delta", text);
+        JsonObject textDone = new JsonObject(); textDone.addProperty("type", "response.output_text.done"); textDone.addProperty("output_index", 0); textDone.addProperty("content_index", 0); textDone.addProperty("text", text);
         JsonObject completed = new JsonObject(); completed.addProperty("type", "response.completed"); completed.add("response", response);
-        return "event: response.created\ndata: " + created + "\n\nevent: response.output_text.delta\ndata: " + delta + "\n\nevent: response.completed\ndata: " + completed + "\n\n";
+        return "event: response.created\ndata: " + created + "\n\n"
+            + "event: response.output_text.delta\ndata: " + delta + "\n\n"
+            + "event: response.output_text.done\ndata: " + textDone + "\n\n"
+            + "event: response.output_item.done\ndata: " + itemDone + "\n\n"
+            + "event: response.completed\ndata: " + completed + "\n\n";
     }
     private static boolean catalogContains(CodexProviderProfile profile, String model) { if (model == null) return false; for (CodexProviderProfile.ModelMapping m : profile.modelCatalog) if (m != null && model.equals(m.model)) return true; return false; }
     private static String sessionId(JsonObject source) { if (source.has("metadata") && source.get("metadata").isJsonObject()) { JsonObject metadata = source.getAsJsonObject("metadata"); String value = string(metadata, "session_id"); if (value != null) return value; value = string(metadata, "user_id"); if (value != null) return value; } return null; }

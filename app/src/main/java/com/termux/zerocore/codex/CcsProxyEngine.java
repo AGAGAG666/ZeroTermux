@@ -3,6 +3,7 @@ package com.termux.zerocore.codex;
 import android.content.Context;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -82,7 +83,7 @@ public final class CcsProxyEngine extends NanoHTTPD {
                         continue;
                     }
                     JsonObject converted = CcsProtocolBridge.toClient(provider, agent,
-                        JsonParser.parseString(raw).getAsJsonObject());
+                        parseUpstream(provider, raw));
                     long[] usage = usage(converted);
                     CcsUsageStore.record(agent, provider.id, model(upstreamBody), true,
                         System.currentTimeMillis() - started, usage[0], usage[1]);
@@ -163,6 +164,81 @@ public final class CcsProxyEngine extends NanoHTTPD {
 
     private static String model(JsonObject body) {
         try { return body.get("model").getAsString(); } catch (Exception ignored) { return ""; }
+    }
+
+    private static JsonObject parseUpstream(CodexProviderProfile provider, String raw) {
+        String value = raw == null ? "" : raw.trim();
+        if (!value.isEmpty() && value.startsWith("{"))
+            return JsonParser.parseString(value).getAsJsonObject();
+
+        List<JsonObject> events = new ArrayList<>();
+        for (String line : raw == null ? new String[0] : raw.split("\\r?\\n")) {
+            if (!line.startsWith("data:")) continue;
+            String data = line.substring(5).trim();
+            if (data.isEmpty() || "[DONE]".equals(data)) continue;
+            try { events.add(JsonParser.parseString(data).getAsJsonObject()); } catch (Exception ignored) {}
+        }
+        if (events.isEmpty()) throw new IllegalStateException("上游返回了无法识别的响应");
+        for (JsonObject event : events) {
+            if ("response.completed".equals(string(event, "type")) && event.has("response")
+                && event.get("response").isJsonObject()) return event.getAsJsonObject("response");
+        }
+        if (CodexProviderProfile.FORMAT_ANTHROPIC.equals(provider.apiFormat))
+            return mergeAnthropicEvents(events);
+        if (CodexProviderProfile.FORMAT_CHAT.equals(provider.apiFormat))
+            return mergeChatEvents(events);
+        return events.get(events.size() - 1);
+    }
+
+    private static JsonObject mergeChatEvents(List<JsonObject> events) {
+        JsonObject result = new JsonObject();
+        result.addProperty("id", "chatcmpl-ccs");
+        result.addProperty("object", "chat.completion");
+        StringBuilder content = new StringBuilder();
+        String finish = "stop";
+        for (JsonObject event : events) {
+            if (event.has("id")) result.add("id", event.get("id"));
+            if (!event.has("choices") || !event.get("choices").isJsonArray()
+                || event.getAsJsonArray("choices").size() == 0) continue;
+            JsonObject choice = event.getAsJsonArray("choices").get(0).getAsJsonObject();
+            if (choice.has("finish_reason") && !choice.get("finish_reason").isJsonNull())
+                finish = choice.get("finish_reason").getAsString();
+            JsonObject delta = choice.has("delta") && choice.get("delta").isJsonObject()
+                ? choice.getAsJsonObject("delta") : null;
+            if (delta != null && delta.has("content") && !delta.get("content").isJsonNull())
+                content.append(delta.get("content").getAsString());
+        }
+        JsonObject message = new JsonObject();
+        message.addProperty("role", "assistant"); message.addProperty("content", content.toString());
+        JsonObject choice = new JsonObject(); choice.addProperty("index", 0);
+        choice.add("message", message); choice.addProperty("finish_reason", finish);
+        JsonArray choices = new JsonArray(); choices.add(choice); result.add("choices", choices);
+        return result;
+    }
+
+    private static JsonObject mergeAnthropicEvents(List<JsonObject> events) {
+        JsonObject result = new JsonObject(); result.addProperty("id", "msg-ccs");
+        result.addProperty("type", "message"); result.addProperty("role", "assistant");
+        StringBuilder content = new StringBuilder();
+        for (JsonObject event : events) {
+            if ("message_start".equals(string(event, "type")) && event.has("message")) {
+                JsonObject message = event.getAsJsonObject("message");
+                if (message.has("id")) result.add("id", message.get("id"));
+                if (message.has("model")) result.add("model", message.get("model"));
+            }
+            if ("content_block_delta".equals(string(event, "type")) && event.has("delta")) {
+                JsonObject delta = event.getAsJsonObject("delta");
+                if ("text_delta".equals(string(delta, "type"))) content.append(string(delta, "text", ""));
+            }
+        }
+        JsonObject block = new JsonObject(); block.addProperty("type", "text"); block.addProperty("text", content.toString());
+        JsonArray blocks = new JsonArray(); blocks.add(block); result.add("content", blocks);
+        result.addProperty("stop_reason", "end_turn");
+        return result;
+    }
+
+    private static String string(JsonObject object, String key) {
+        return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : null;
     }
 
     private static JsonObject error(String message) {

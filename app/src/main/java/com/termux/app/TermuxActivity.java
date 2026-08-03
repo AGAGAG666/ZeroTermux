@@ -89,6 +89,7 @@ import com.termux.app.activities.SettingsActivity;
 import com.termux.app.terminal.TermuxSessionsListViewController;
 import com.termux.app.terminal.io.TerminalToolbarViewPager;
 import com.termux.app.terminal.TermuxTerminalViewClient;
+import com.termux.app.terminal.LegacyCodexSessionCleanup;
 
 import com.termux.shared.logger.Logger;
 import com.termux.shared.termux.TermuxUtils;
@@ -530,6 +531,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         mTermuxService = ((TermuxService.LocalBinder) service).service;
 
+        LegacyCodexSessionCleanup.run(mTermuxService);
         setTermuxSessionsListView();
         // ZeroTermux add {@
         fragmentManager(0);
