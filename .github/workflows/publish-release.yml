@@ -1,0 +1,43 @@
+name: Publish Release Asset
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: '成功的构建运行 ID'
+        required: true
+        default: '30802610591'
+        type: string
+      release_tag:
+        description: '要发布的 Release 标签'
+        required: true
+        default: 'codex-termux-final-57dc80e'
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载构建产物
+        uses: actions/download-artifact@v7
+        with:
+          name: ZeroTermux-Nightly_debug_arm64-v8a
+          path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.build_run_id }}
+
+      - name: 发布 APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          apk="$(find dist -type f -name '*.apk' -print -quit)"
+          test -n "$apk"
+          gh release upload "${{ inputs.release_tag }}" "$apk" \
+            --repo "${{ github.repository }}" --clobber
+          gh release edit "${{ inputs.release_tag }}" \
+            --repo "${{ github.repository }}" --draft=false
