@@ -54,7 +54,20 @@ jobs:
           # rquickjs / bindgen 需要 sysroot
           export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
 
-          cargo build --release --target aarch64-linux-android 2>&1 | tail -40
+          set -o pipefail
+          cargo build --release --target aarch64-linux-android 2>&1 | tail -60
+
+      - name: 确认没有 openssl-sys 混入
+        run: |
+          cargo tree --target aarch64-linux-android -e normal > tree.txt 2>/dev/null || true
+          if grep -q 'openssl-sys' tree.txt; then
+            echo "::error::openssl-sys 被引入，Android 无系统 openssl"
+            grep -n -B6 'openssl-sys' tree.txt | head -40
+            exit 1
+          fi
+          echo "openssl-sys 未引入 (ok)"
+          echo "--- TLS 相关依赖 ---"
+          grep -nE 'rustls|ring|webpki|native-tls' tree.txt | head -20
 
       - name: 校验产物
         run: |
