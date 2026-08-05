@@ -29,6 +29,12 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: 安装 libclang (rquickjs bindgen 需要)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libclang-dev clang
+          echo "LIBCLANG_PATH=$(dirname "$(ls /usr/lib/llvm-*/lib/libclang.so* | head -1)")" >> "$GITHUB_ENV"
+
       - name: 定位 NDK
         id: ndk
         run: |
@@ -51,8 +57,13 @@ jobs:
           # cc crate 用的变量名
           export TARGET_CC="$CC_aarch64_linux_android"
           export TARGET_AR="$AR_aarch64_linux_android"
-          # rquickjs / bindgen 需要 sysroot
-          export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          # rquickjs bindgen：需显式给出目标三元组与 NDK sysroot，
+          # 否则会按宿主 x86_64 生成绑定。
+          SYSROOT="$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          export BINDGEN_EXTRA_CLANG_ARGS="--target=aarch64-linux-android$API --sysroot=$SYSROOT"
+          export CLANG_PATH="$TC/clang"
+          echo "LIBCLANG_PATH=$LIBCLANG_PATH"
+          echo "BINDGEN_EXTRA_CLANG_ARGS=$BINDGEN_EXTRA_CLANG_ARGS"
 
           set -o pipefail
           cargo build --release --target aarch64-linux-android 2>&1 | tail -60
