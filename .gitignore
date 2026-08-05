@@ -39,3 +39,6 @@ QWEN.md
 .swp
 ehthumbs.db
 Thumbs.db
+
+# CCS 移植：Rust 探针/核心构建产物
+ccs-core-probe/target/

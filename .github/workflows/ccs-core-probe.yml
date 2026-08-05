@@ -1,0 +1,74 @@
+name: CCS Core Probe (Android)
+
+# 验证 cc-switch 的高风险原生依赖能否交叉编译到 aarch64-linux-android。
+# 这是 CCS 完整移植（Rust sidecar 路线）的成败点，先跑通再动主工程。
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_level:
+        description: 'Android API level'
+        required: false
+        default: '24'
+        type: string
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ccs-core-probe
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 安装 Rust + Android target
+        run: |
+          rustup toolchain install 1.95 --profile minimal
+          rustup default 1.95
+          rustup target add aarch64-linux-android
+          rustc --version
+          cargo --version
+
+      - name: 定位 NDK
+        id: ndk
+        run: |
+          # runner 自带 NDK；取最高版本
+          ndk_root="$(ls -d "$ANDROID_SDK_ROOT"/ndk/* | sort -V | tail -1)"
+          echo "path=$ndk_root" >> "$GITHUB_OUTPUT"
+          echo "NDK = $ndk_root"
+          ls "$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/bin" | grep -E 'aarch64.*(clang|ar)$' | head
+
+      - name: 交叉编译 (aarch64-linux-android)
+        env:
+          NDK: ${{ steps.ndk.outputs.path }}
+          API: ${{ inputs.api_level }}
+        run: |
+          TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CC_aarch64_linux_android="$TC/aarch64-linux-android$API-clang"
+          export CXX_aarch64_linux_android="$TC/aarch64-linux-android$API-clang++"
+          export AR_aarch64_linux_android="$TC/llvm-ar"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CC_aarch64_linux_android"
+          # cc crate 用的变量名
+          export TARGET_CC="$CC_aarch64_linux_android"
+          export TARGET_AR="$AR_aarch64_linux_android"
+          # rquickjs / bindgen 需要 sysroot
+          export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+
+          cargo build --release --target aarch64-linux-android 2>&1 | tail -40
+
+      - name: 校验产物
+        run: |
+          bin=target/aarch64-linux-android/release/ccs-core-probe
+          test -f "$bin"
+          file "$bin"
+          ls -lh "$bin"
+          echo "sha256=$(sha256sum "$bin" | cut -d' ' -f1)"
+          echo "--- 动态依赖（应只有 bionic：libc/libm/libdl，不含 GTK/WebKit）---"
+          "$ANDROID_SDK_ROOT"/ndk/*/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf -d "$bin" | grep -i needed || true
+
+      - name: 上传探针二进制
+        uses: actions/upload-artifact@v7
+        with:
+          name: ccs-core-probe_arm64-v8a
+          path: ccs-core-probe/target/aarch64-linux-android/release/ccs-core-probe
+          if-no-files-found: error
