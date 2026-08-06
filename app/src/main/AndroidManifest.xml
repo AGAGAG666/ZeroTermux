@@ -143,12 +143,16 @@
             android:exported="false"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
-        <activity android:name=".zerocore.codex.CodexProviderActivity"
+        <!-- cc-switch 完整移植：原生 sidecar 宿主页面 + 持有它的前台服务。 -->
+        <activity
+            android:name=".zerocore.ccs.CcsSwitchActivity"
             android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+            android:label="@string/cc_switch_title"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
         <service
-            android:name=".zerocore.codex.CcsProxyService"
+            android:name=".zerocore.ccs.CcsSidecarService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 

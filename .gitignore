@@ -42,3 +42,8 @@ Thumbs.db
 
 # CCS 移植：Rust 探针/核心构建产物
 ccs-core-probe/target/
+
+# CCS 移植：cc-switch sidecar 产物下载缓存（由 app/build.gradle 的 downloadCcsArtifacts 落位）
+app/ccs-artifacts/
+# 本地 CI 产物缓存
+.ci-artifact/

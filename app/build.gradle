@@ -241,6 +241,15 @@ android {
         }
     }
 
+    // ZeroTermux add {@ cc-switch sidecar 产物（由 downloadCcsArtifacts 任务落位，不入库）
+    sourceSets {
+        main {
+            jniLibs.srcDirs += ["ccs-artifacts/jniLibs"]
+            assets.srcDirs += ["ccs-artifacts/assets"]
+        }
+    }
+    // @}
+
     lint {
         disable 'ProtectedPermissions'
     }
@@ -250,6 +259,12 @@ android {
             includeAndroidResources = true
         }
     }
+
+    // ZeroTermux add {@ 前端产物已是 deflate 压缩包，别让 aapt 再压一遍
+    androidResources {
+        noCompress "zip"
+    }
+    // @}
 
     packagingOptions {
         jniLibs {
@@ -388,8 +403,115 @@ clean {
         def tree = fileTree(new File(projectDir, 'src/main/cpp'))
         tree.include 'bootstrap-*.zip'
         tree.each { it.delete() }
+        // ZeroTermux add {@ 同时清掉 cc-switch 产物缓存
+        delete new File(projectDir, 'ccs-artifacts')
+        // @}
     }
 }
+
+// ZeroTermux add {@ cc-switch Android sidecar 产物拉取
+// 产物由 AGAGAG666/cc-switch 的 Android CI 交叉编译产生，按 tag + SHA-256 钉死。
+// 不入库（16MB 原生可执行 + 2MB 前端站点），构建时下载到 app/ccs-artifacts/ 并校验。
+ext.ccsArtifactTag = "ccs-android-c5a9b1e"
+ext.ccsArtifacts = [
+    [
+        name    : "libccsidecar.so",
+        dest    : "ccs-artifacts/jniLibs/arm64-v8a/libccsidecar.so",
+        sha256  : "4e284b3c83535e01b34281c944efe9fa646ff6b44f9bee4ed9ffd78b5809634b",
+        size    : 16355016L
+    ],
+    [
+        name    : "ccs-web.zip",
+        dest    : "ccs-artifacts/assets/ccs-web.zip",
+        sha256  : "6fd01d631d7de33a169c3e70bd228f0ee12919c491fb1a29876e86003b9b8ec2",
+        size    : 2009156L
+    ]
+]
+
+def sha256Of(File file) {
+    def digest = java.security.MessageDigest.getInstance("SHA-256")
+    def buffer = new byte[8192]
+    file.withInputStream { input ->
+        while (true) {
+            def readBytes = input.read(buffer)
+            if (readBytes < 0) break
+            digest.update(buffer, 0, readBytes)
+        }
+    }
+    def checksum = new BigInteger(1, digest.digest()).toString(16)
+    while (checksum.length() < 64) checksum = "0" + checksum
+    return checksum
+}
+
+def downloadCcsArtifact(Map spec, String tag) {
+    def file = new File(projectDir, spec.dest as String)
+
+    if (file.exists()) {
+        def actual = sha256Of(file)
+        if (actual == spec.sha256) {
+            logger.quiet("cc-switch 产物已就绪: " + spec.dest + " (sha256 " + actual + ")")
+            return
+        }
+        logger.quiet("cc-switch 产物哈希不符，删除重下: " + spec.dest + " expected=" + spec.sha256 + " actual=" + actual)
+        file.delete()
+    }
+
+    // 允许用本地目录覆盖（离线构建 / 调试未发布的产物）
+    def override = System.getenv("CCS_ARTIFACT_DIR")
+    if (override) {
+        def src = new File(override, spec.name as String)
+        if (!src.exists()) {
+            throw new GradleException("CCS_ARTIFACT_DIR=" + override + " 下缺少 " + spec.name)
+        }
+        file.parentFile.mkdirs()
+        file.bytes = src.bytes
+        def actual = sha256Of(file)
+        if (actual != spec.sha256) {
+            file.delete()
+            throw new GradleException("本地 cc-switch 产物哈希不符 " + spec.name + ": expected=" + spec.sha256 + " actual=" + actual)
+        }
+        logger.quiet("cc-switch 产物取自本地目录: " + src)
+        return
+    }
+
+    def remoteUrl = "https://github.com/AGAGAG666/cc-switch/releases/download/" + tag + "/" + spec.name
+    logger.quiet("下载 cc-switch 产物 " + remoteUrl + " ...")
+
+    file.parentFile.mkdirs()
+    def digest = java.security.MessageDigest.getInstance("SHA-256")
+    def connection = new URL(remoteUrl).openConnection()
+    connection.setInstanceFollowRedirects(true)
+    connection.setConnectTimeout(30000)
+    connection.setReadTimeout(120000)
+    def out = new BufferedOutputStream(new FileOutputStream(file))
+    try {
+        out << new java.security.DigestInputStream(connection.inputStream, digest)
+    } finally {
+        out.close()
+    }
+
+    def checksum = new BigInteger(1, digest.digest()).toString(16)
+    while (checksum.length() < 64) checksum = "0" + checksum
+    if (checksum != spec.sha256) {
+        file.delete()
+        throw new GradleException("cc-switch 产物哈希不符 " + remoteUrl + ": expected=" + spec.sha256 + " actual=" + checksum)
+    }
+    if (file.length() != spec.size) {
+        file.delete()
+        throw new GradleException("cc-switch 产物大小不符 " + remoteUrl + ": expected=" + spec.size + " actual=" + file.length())
+    }
+    logger.quiet("cc-switch 产物校验通过: " + spec.dest + " (" + file.length() + " 字节)")
+}
+
+task downloadCcsArtifacts() {
+    description "下载并校验 cc-switch Android sidecar 产物（原生可执行 + 前端站点）"
+    doLast {
+        project.ext.ccsArtifacts.each { spec ->
+            downloadCcsArtifact(spec as Map, project.ext.ccsArtifactTag as String)
+        }
+    }
+}
+// @}
 
 task downloadBootstraps() {
     // ZeroTermux modify{@
@@ -426,3 +548,34 @@ afterEvaluate {
         variant.javaCompileProvider.get().dependsOn(downloadBootstraps)
     }
 }
+
+// ZeroTermux add {@ cc-switch 产物必须先于 assets/jniLibs 合并落位。
+// AGP 8 的 merge* 任务是惰性创建的，afterEvaluate 里 tasks.findByName 可能取不到
+// 而静默跳过——那会打出一个没有 sidecar 的 APK。用 configureEach 按名匹配，
+// 任务什么时候被真正创建都能挂上；再用 doFirst 断言兜底，宁可构建失败也不出残包。
+tasks.configureEach { t ->
+    if (t.name ==~ /^merge.*(Assets|JniLibFolders|NativeLibs)$/) {
+        t.dependsOn(tasks.named("downloadCcsArtifacts"))
+    }
+}
+
+tasks.configureEach { t ->
+    if (t.name ==~ /^merge.*NativeLibs$/) {
+        t.doFirst {
+            def buildArch = System.getProperty("arch", "all")
+            boolean needsArm64 = buildArch in ["all", "universal", "arm64"]
+            if (needsArm64) {
+                def so = new File(projectDir, "ccs-artifacts/jniLibs/arm64-v8a/libccsidecar.so")
+                if (!so.isFile()) {
+                    throw new GradleException("cc-switch sidecar 未落位: " + so
+                        + "（downloadCcsArtifacts 未生效，APK 会缺少 CC Switch 原生进程）")
+                }
+            }
+            def web = new File(projectDir, "ccs-artifacts/assets/ccs-web.zip")
+            if (!web.isFile()) {
+                throw new GradleException("cc-switch 前端产物未落位: " + web)
+            }
+        }
+    }
+}
+// @}

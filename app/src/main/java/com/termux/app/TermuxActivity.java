@@ -115,7 +115,7 @@ import com.termux.zerocore.bean.ZDYDataBean;
 import com.termux.zerocore.bean.ZTUserBean;
 import com.termux.zerocore.broadcast.LocalReceiver;
 import com.termux.zerocore.code.CodeString;
-import com.termux.zerocore.codex.CodexProviderActivity;
+import com.termux.zerocore.ccs.CcsSwitchActivity;
 import com.termux.zerocore.config.ZTConstantConfig;
 import com.termux.zerocore.config.mainmenu.MainMenuPackageInfo;
 import com.termux.zerocore.config.mainmenu.MainMenuPackageManager;
@@ -1530,7 +1530,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setEgInstallStatus();
         findViewById(R.id.cc_switch_button).setOnClickListener(v -> {
             if (getDrawer().isOpened()) getDrawer().smoothClose();
-            startActivity(new Intent(TermuxActivity.this, CodexProviderActivity.class));
+            // cc-switch 完整移植：跳原版 React 前端宿主页（CcsSwitchActivity），
+            // 取代此前的精简原生实现 CodexProviderActivity。
+            startActivity(new Intent(TermuxActivity.this, CcsSwitchActivity.class));
         });
         // ZeroTermux add {@
         View aiPanelHost = findViewById(R.id.ai_agent_panel_host);
