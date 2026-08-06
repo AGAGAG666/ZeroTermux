@@ -89,9 +89,13 @@ public class CcsSidecarService extends Service implements CcsSidecar.Listener {
                 updateNotification("启动失败：" + e.getMessage());
             }
         });
-        // START_STICKY：被系统回收后重建服务并重新拉起 sidecar，
-        // 保证终端里长跑的 codex 不会因为代理消失而在半路失联。
-        return START_STICKY;
+        // START_NOT_STICKY：不让 Android 在进程被杀后自动重建服务。
+        // START_STICKY 会在 Termux 每次冷启动时触发 sidecar 的后台重启（含
+        // DB 迁移、16MB 二进制加载），与 Termux 主进程初始化争 CPU/IO，
+        // 导致终端明显变慢。改为 NOT_STICKY 后，代理在 Termux 进程活着时
+        // 一直运行；进程被杀后代理也一起消失，用户再次打开 CC Switch 页面
+        // 即可重启（CcsSwitchActivity.startSidecar() 会重新 start 本服务）。
+        return START_NOT_STICKY;
     }
 
     @Override public void onDestroy() {
