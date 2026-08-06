@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -63,6 +64,22 @@ public final class CcsSidecar {
     private static final int MIN_SDK_FOR_SIDECAR = 24;
     /** 握手行等待上限。首启要跑数据库迁移（v1→v16，含插入 188 条模型定价）。 */
     private static final long HANDSHAKE_TIMEOUT_MS = 60_000L;
+    /**
+     * sidecar 主动请求宿主重启自己时使用的退出码。
+     *
+     * <p>来自 {@code tauri-shim/src/lib.rs} 的 {@code RESTART_EXIT_CODE}：桌面 Tauri 的
+     * {@code app.restart()} 由框架负责重新拉起进程，shim 无法自己复活，于是约定
+     * 「以 51 退出，由宿主重启」。前端设置页改配置目录后调用的 {@code restart_app}
+     * 走的正是这条路径，宿主必须接住，否则 sidecar 退出后永不回来。
+     */
+    private static final int RESTART_EXIT_CODE = 51;
+    /** 自动重启配额上限（每 {@link #RESTART_WINDOW_MS} 窗口）。防止起不来时无限刷进程。 */
+    private static final int MAX_AUTO_RESTARTS = 3;
+    private static final long RESTART_WINDOW_MS = 60_000L;
+    /** 收到「按设计退出」后的重启间隔：只需让端口与文件锁释放干净。 */
+    private static final long RESTART_DELAY_MS = 300L;
+    /** 意外崩溃后的重启间隔：留出更多余量，避免瞬时故障导致密集重试。 */
+    private static final long CRASH_RESTART_DELAY_MS = 1_500L;
 
     private static final Object LOCK = new Object();
     @Nullable private static CcsSidecar instance;
@@ -80,9 +97,32 @@ public final class CcsSidecar {
         }
     }
 
+    /**
+     * sidecar 生命周期观察者。
+     *
+     * <p>存在的理由：sidecar 可能在无人调用的情况下换一个端口重生（{@code restart_app}
+     * 或崩溃自愈），此时已加载页面的 WebView 仍指着旧端口，必须被动收到通知才能重载。
+     */
+    public interface Listener {
+        /** sidecar 在非主动请求的情况下重新就绪（端口通常已变化）。 */
+        void onSidecarReady(Handshake handshake);
+        /** sidecar 退出且无法恢复，附带可直接展示给用户的原因。 */
+        void onSidecarLost(String message);
+    }
+
     private final Context appContext;
+    private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
     @Nullable private Process process;
     @Nullable private Handshake handshake;
+    /**
+     * 启动世代号。每次成功启动 +1，守护线程用它判断自己盯的那个进程是否已被替换，
+     * 避免「主动重启」与「守护自愈」同时开工起出两个进程。
+     */
+    private int generation;
+    private int autoRestarts;
+    private long autoRestartWindowStart;
+    /** 最近一次成功启动的时刻，用于判断「刚重启过」，避免重复重启。 */
+    private long startedAt;
 
     private CcsSidecar(Context context) {
         this.appContext = context.getApplicationContext();
@@ -93,6 +133,15 @@ public final class CcsSidecar {
             if (instance == null) instance = new CcsSidecar(context);
             return instance;
         }
+    }
+
+    /** 注册生命周期观察者。调用方必须在自身销毁时 {@link #removeListener} 解注册。 */
+    public void addListener(Listener listener) {
+        listeners.addIfAbsent(listener);
+    }
+
+    public void removeListener(Listener listener) {
+        listeners.remove(listener);
     }
 
     /** 当前握手信息；未启动时为 null。 */
@@ -178,10 +227,138 @@ public final class CcsSidecar {
         // stderr 全量转 logcat：Rust 侧的 android_log 走 stderr。
         pumpToLog(proc.getErrorStream(), "ccs-stderr");
 
-        Handshake result = readHandshake(proc);
+        Handshake result;
+        try {
+            result = readHandshake(proc);
+        } catch (IOException | RuntimeException e) {
+            // 握手失败时 readHandshake 已销毁进程，但字段还指着它；清掉以免
+            // isRunning()/ensureStarted() 依据一个死进程做判断。
+            process = null;
+            throw e;
+        }
         handshake = result;
-        Log.i(TAG, "sidecar 就绪 port=" + result.port);
+        generation++;
+        startedAt = System.currentTimeMillis();
+        watch(proc, generation);
+        Log.i(TAG, "sidecar 就绪 port=" + result.port + " gen=" + generation);
         return result;
+    }
+
+    /**
+     * 主动重启 sidecar 并返回新的握手信息。
+     *
+     * <p>与「先 {@link #shutdown()} 再 {@link #ensureStarted()}」的区别：这两步之间存在
+     * 空窗，守护线程或另一个调用方可能挤进来各起一个进程。这里整段持锁，保证串行。
+     * 阻塞调用，必须在工作线程执行。
+     */
+    /**
+     * 若 sidecar 刚在 {@code freshWindowMs} 内启动过且健康，直接复用；否则重启。
+     *
+     * <p>解决的是一次真实的重复动作：前端点重启 → sidecar 以 51 退出 → 守护线程已经
+     * 把它拉了起来；而前端在退出前抢收到的 SSE {@code host-action{restart}} 随后才
+     * 到达宿主。此时再重启一次纯属多余（还会白掉一次页面），复用即可。
+     *
+     * <p>阻塞调用，必须在工作线程执行。
+     */
+    public Handshake restartOrReuse(long freshWindowMs) throws IOException {
+        Handshake reuse = null;
+        synchronized (LOCK) {
+            Handshake current = handshake;
+            if (current != null && process != null && process.isAlive()
+                && System.currentTimeMillis() - startedAt <= freshWindowMs
+                && healthy(current)) {
+                reuse = current;
+            }
+        }
+        if (reuse == null) return restartNow();
+        Log.i(TAG, "sidecar 刚启动过，跳过重复重启，复用端口 " + reuse.port);
+        // 复用也走 onSidecarReady：调用方（页面）此时已切到遮罩态，必须有一次
+        // 就绪回调把它撤下来。让两条分支的通知形状一致，调用方就不需要分支处理。
+        for (Listener l : listeners) l.onSidecarReady(reuse);
+        return reuse;
+    }
+
+    public Handshake restartNow() throws IOException {
+        Handshake next;
+        synchronized (LOCK) {
+            shutdownLocked();
+            // 用户/前端显式要求的重启不该消耗崩溃自愈配额。
+            autoRestarts = 0;
+            autoRestartWindowStart = System.currentTimeMillis();
+            next = startLocked();
+        }
+        // 通知一律在锁外发：观察者回调里可能反过来查询状态，持锁会死锁。
+        for (Listener l : listeners) l.onSidecarReady(next);
+        return next;
+    }
+
+    /**
+     * 守护一个已就绪的 sidecar 进程：退出后按退出码决定是否自愈。
+     *
+     * <p>退出码 {@link #RESTART_EXIT_CODE} 是 sidecar 按设计请求重启（见常量注释）；
+     * 其余非零退出视为崩溃，同样重启，但共用一份配额，超额后停手并通知观察者，
+     * 避免二进制根本起不来时无限刷进程。
+     */
+    private void watch(Process proc, int gen) {
+        Thread t = new Thread(() -> {
+            int code;
+            try {
+                code = proc.waitFor();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            boolean byDesign = code == RESTART_EXIT_CODE;
+            Log.w(TAG, "sidecar 退出 exit=" + code + " gen=" + gen
+                + (byDesign ? "（按设计请求重启）" : "（意外退出）"));
+
+            try {
+                Thread.sleep(byDesign ? RESTART_DELAY_MS : CRASH_RESTART_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+
+            Handshake next = null;
+            String failure = null;
+            synchronized (LOCK) {
+                // 期间已被主动重启或主动停止，这条守护就此退场。
+                if (generation != gen || process != proc) return;
+                process = null;
+                handshake = null;
+                if (!claimAutoRestartLocked()) {
+                    failure = "CC Switch 本地服务反复退出（exit=" + code + "），已停止自动重启";
+                } else {
+                    try {
+                        next = startLocked();
+                    } catch (IOException | RuntimeException e) {
+                        Log.e(TAG, "sidecar 自愈重启失败", e);
+                        failure = "CC Switch 本地服务重启失败：" + e.getMessage();
+                    }
+                }
+            }
+            if (next != null) {
+                Log.i(TAG, "sidecar 已自愈，新端口 " + next.port);
+                for (Listener l : listeners) l.onSidecarReady(next);
+            } else if (failure != null) {
+                Log.e(TAG, failure);
+                for (Listener l : listeners) l.onSidecarLost(failure);
+            }
+        }, "ccs-watchdog-" + gen);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** 领取一次自动重启配额；窗口过期则重置。必须持 {@link #LOCK} 调用。 */
+    private boolean claimAutoRestartLocked() {
+        long now = System.currentTimeMillis();
+        if (now - autoRestartWindowStart > RESTART_WINDOW_MS) {
+            autoRestartWindowStart = now;
+            autoRestarts = 0;
+        }
+        if (autoRestarts >= MAX_AUTO_RESTARTS) return false;
+        autoRestarts++;
+        return true;
     }
 
     /**

@@ -42,8 +42,11 @@ import java.util.concurrent.Executors;
  *       无需 Java 侧 evaluateJavascript 补握手</li>
  * </ol>
  */
-public class CcsSwitchActivity extends AppCompatActivity implements CcsHostBridge.Host {
+public class CcsSwitchActivity extends AppCompatActivity
+        implements CcsHostBridge.Host, CcsSidecar.Listener {
     private static final String TAG = "CcsSwitchActivity";
+    /** 前端请求重启时，判定「刚重启过可直接复用」的时间窗。 */
+    private static final long RESTART_REUSE_WINDOW_MS = 5_000L;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -53,6 +56,12 @@ public class CcsSwitchActivity extends AppCompatActivity implements CcsHostBridg
     @Nullable private ProgressBar spinner;
     @Nullable private TextView status;
     @Nullable private String origin;
+    /**
+     * 是否处于「正在重启 sidecar」的遮罩状态，用于避免自愈通知重复切 UI。
+     * 只在主线程读写（{@code requestRestartSidecar} 由 WebView 的 binder 线程调用，
+     * 故所有变更都经 {@code main.post} 归拢到主线程，无需额外同步）。
+     */
+    private boolean restarting;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -137,6 +146,8 @@ public class CcsSwitchActivity extends AppCompatActivity implements CcsHostBridg
         root.addView(text);
         setContentView(root);
 
+        // 注册要早于启动：首启期间若 sidecar 立刻按 51 退出，自愈后的通知也不该漏掉。
+        CcsSidecar.get(this).addListener(this);
         startSidecar();
     }
 
@@ -149,9 +160,8 @@ public class CcsSwitchActivity extends AppCompatActivity implements CcsHostBridg
             try {
                 CcsSidecar.Handshake h = CcsSidecar.get(this).ensureStarted();
                 main.post(() -> {
-                    origin = "http://127.0.0.1:" + h.port;
                     if (status != null) status.setText("正在加载界面…");
-                    if (web != null) web.loadUrl(h.url);
+                    load(h);
                 });
             } catch (IOException | RuntimeException e) {
                 Log.e(TAG, "sidecar 启动失败", e);
@@ -238,22 +248,70 @@ public class CcsSwitchActivity extends AppCompatActivity implements CcsHostBridg
     }
 
     @Override public void requestRestartSidecar() {
-        if (status != null) status.setVisibility(View.VISIBLE);
-        if (spinner != null) spinner.setVisibility(View.VISIBLE);
-        if (web != null) web.setVisibility(View.INVISIBLE);
+        showRestarting("正在重启 CC Switch 服务…");
         worker.execute(() -> {
-            CcsSidecar.get(this).shutdown();
             try {
-                CcsSidecar.Handshake h = CcsSidecar.get(this).ensureStarted();
-                main.post(() -> {
-                    origin = "http://127.0.0.1:" + h.port;
-                    if (web != null) web.loadUrl(h.url);
-                });
+                // 走 restartOrReuse 而不是 shutdown()+ensureStarted()：后者两步之间有
+                // 空窗，会与守护线程的自愈重启撞车起出两个进程；带新鲜度窗口则能吸收
+                // 「sidecar 已按 51 退出并被守护线程拉起，SSE 通知随后才到」这一重复动作。
+                // 新端口统一由 onSidecarReady 送达（重启与复用两条分支都会回调），
+                // 这里不再自行 loadUrl，避免两次 loadUrl 互相打断。
+                CcsSidecar.get(this).restartOrReuse(RESTART_REUSE_WINDOW_MS);
             } catch (IOException | RuntimeException e) {
                 Log.e(TAG, "sidecar 重启失败", e);
                 main.post(() -> showFailure(e));
             }
         });
+    }
+
+    // ── CcsSidecar.Listener ─────────────────────────────────────
+
+    /**
+     * sidecar 换端口重生后重载页面。
+     *
+     * <p>触发来源有两种：前端设置页点重启（{@code restart_app} → 以 51 退出），
+     * 以及 sidecar 意外崩溃后守护线程自愈。两者对 WebView 的影响相同——旧端口失效，
+     * 已建立的 SSE 断开，必须整页重载才能拿到新的 {@code window.__CCS_SIDECAR__}。
+     */
+    @Override public void onSidecarReady(CcsSidecar.Handshake handshake) {
+        main.post(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!restarting) showRestarting("CC Switch 服务已重启，正在重新加载…");
+            load(handshake);
+        });
+    }
+
+    @Override public void onSidecarLost(String message) {
+        main.post(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            restarting = false;
+            if (spinner != null) spinner.setVisibility(View.GONE);
+            if (web != null) web.setVisibility(View.INVISIBLE);
+            if (status != null) {
+                status.setVisibility(View.VISIBLE);
+                status.setText(message);
+            }
+        });
+    }
+
+    /** 主线程：把页面切到遮罩态。 */
+    private void showRestarting(String text) {
+        main.post(() -> {
+            restarting = true;
+            if (status != null) {
+                status.setVisibility(View.VISIBLE);
+                status.setText(text);
+            }
+            if (spinner != null) spinner.setVisibility(View.VISIBLE);
+            if (web != null) web.setVisibility(View.INVISIBLE);
+        });
+    }
+
+    /** 主线程：按握手信息切换源并加载。 */
+    private void load(CcsSidecar.Handshake handshake) {
+        origin = "http://127.0.0.1:" + handshake.port;
+        restarting = false;
+        if (web != null) web.loadUrl(handshake.url);
     }
 
     // ── 生命周期 ────────────────────────────────────────────────
@@ -267,6 +325,7 @@ public class CcsSwitchActivity extends AppCompatActivity implements CcsHostBridg
     }
 
     @Override protected void onDestroy() {
+        CcsSidecar.get(this).removeListener(this);
         // sidecar 故意不随页面关闭而停止：它同时承载路由代理（codex/opencode 的
         // 上游转换），终端里的 CLI 仍在用。停止由 CcsSidecarService 统一负责。
         if (web != null) {

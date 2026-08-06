@@ -28,7 +28,7 @@ import java.util.concurrent.Executors;
  * 所以 GUI 页面关掉之后代理必须继续活着；而 Android 会回收没有前台组件的进程组，
  * 只有前台服务能给它一个稳定的存活理由。
  */
-public class CcsSidecarService extends Service {
+public class CcsSidecarService extends Service implements CcsSidecar.Listener {
     private static final String TAG = "CcsSidecarService";
     public static final String ACTION_START = "com.termux.ccs.sidecar.START";
     public static final String ACTION_STOP = "com.termux.ccs.sidecar.STOP";
@@ -55,6 +55,17 @@ public class CcsSidecarService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         createChannel();
+        // sidecar 可能自行换端口重生（restart_app / 崩溃自愈），通知栏得跟着走，
+        // 否则用户看到的端口是过期的。
+        CcsSidecar.get(this).addListener(this);
+    }
+
+    @Override public void onSidecarReady(CcsSidecar.Handshake handshake) {
+        updateNotification("本地服务运行中 · 端口 " + handshake.port);
+    }
+
+    @Override public void onSidecarLost(String message) {
+        updateNotification(message);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -84,6 +95,7 @@ public class CcsSidecarService extends Service {
     }
 
     @Override public void onDestroy() {
+        CcsSidecar.get(this).removeListener(this);
         // 服务销毁即代理不可用，进程留着只会变成孤儿。
         CcsSidecar.get(this).shutdown();
         worker.shutdownNow();
