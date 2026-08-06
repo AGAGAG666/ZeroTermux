@@ -16,7 +16,6 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -186,18 +185,48 @@ public class CcsSwitchActivity extends AppCompatActivity implements CcsHostBridg
     // ── CcsHostBridge.Host ──────────────────────────────────────
 
     @Override public void requestFolderPick(int requestId) {
-        // Android 的 SAF 返回 tree Uri 而非文件系统路径，而 cc-switch 需要的是
-        // 能被 CLI 直接使用的真实路径，两者不可互转。这里明确返回 null，前端会
-        // 退回手输路径（配置里的目录都在 Termux 家目录下，手输是可行路径）。
+        // 不走 SAF：它返回 content:// 树 Uri，而 cc-switch 要的是能写进配置、
+        // 被 Termux 里 CLI 直接使用的真实路径，且目标目录都在 Termux 私有目录内，
+        // 外部选择器看不见。改用 CcsDirectoryPicker（基于 File 的浏览器）。
+        main.post(() -> {
+            if (isFinishing() || isDestroyed()) {
+                resolveFolderPick(requestId, null);
+                return;
+            }
+            CcsDirectoryPicker.show(this, null,
+                path -> resolveFolderPick(requestId, path));
+        });
+    }
+
+    /** 把选择结果回送给前端挂起的 Promise。{@code null} 等价用户取消。 */
+    private void resolveFolderPick(int requestId, @Nullable String path) {
         main.post(() -> {
             if (web == null) return;
+            String arg = path == null ? "null" : "\"" + jsEscape(path) + "\"";
             web.evaluateJavascript(
                 "window.__ccsResolveFolderPick&&window.__ccsResolveFolderPick("
-                    + requestId + ",null);", null);
-            Toast.makeText(this,
-                "请直接填写目录路径（Termux 家目录：/data/data/com.termux/files/home）",
-                Toast.LENGTH_LONG).show();
+                    + requestId + "," + arg + ");", null);
         });
+    }
+
+    /** 路径进 JS 字符串字面量前的转义。Termux 路径不含引号，但不能假定。 */
+    private static String jsEscape(String s) {
+        StringBuilder b = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\': b.append("\\\\"); break;
+                case '"':  b.append("\\\""); break;
+                case '\n': b.append("\\n"); break;
+                case '\r': b.append("\\r"); break;
+                case '\u2028': b.append("\\u2028"); break;
+                case '\u2029': b.append("\\u2029"); break;
+                default:
+                    if (c < 0x20) b.append(String.format("\\u%04x", (int) c));
+                    else b.append(c);
+            }
+        }
+        return b.toString();
     }
 
     @Override public void requestClose() {
