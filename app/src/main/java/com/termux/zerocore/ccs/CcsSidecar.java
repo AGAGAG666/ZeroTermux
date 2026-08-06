@@ -1,12 +1,11 @@
 package com.termux.zerocore.ccs;
 
 import android.content.Context;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import com.termux.BuildConfig;
 import com.termux.shared.termux.TermuxConstants;
 
 import org.json.JSONObject;
@@ -439,7 +438,7 @@ public final class CcsSidecar {
     // ── 前端产物解包 ────────────────────────────────────────────
 
     /**
-     * 把 assets 里的前端产物解包到 {@code filesDir/ccs-web/<versionCode>}。
+     * 把 assets 里的前端产物解包到 {@code filesDir/ccs-web/<web-sha-16>}。
      *
      * <p>为什么必须解包：sidecar 是独立原生进程，读不到 APK 里的 assets（那是
      * AssetManager 的虚拟路径），只能给它一个真实文件系统目录。
@@ -447,11 +446,14 @@ public final class CcsSidecar {
      * <p>产物以单个 zip 交付而非 assets 目录树：一次流式解压比对 27 个文件逐个
      * {@code AssetManager.list()} + open 快得多，且构建侧只需校验一个 SHA-256。
      *
-     * <p>按 versionCode 分目录 + 完成标记，保证覆盖安装后必定用新产物，
-     * 且不会每次启动都重复解包 5MB。
+     * <p>目录名取前端产物 SHA-256 前 16 位，配合完成标记。<b>不能用 versionCode
+     * 当 key</b>：它不随每次构建递增（长期钉在 118），而覆盖安装不清 filesDir，
+     * 于是标记和 index.html 都还在，解包被整体跳过，旧前端被无限复用——前端侧
+     * 的修复因此会表现为"改了没生效"，只有卸载重装才生效。换成内容哈希后，
+     * 产物一变必定重解，产物没变则不重复解包 2MB。
      */
     @Nullable private File ensureWebroot() {
-        String version = String.valueOf(versionCode());
+        String version = webAssetKey();
         File root = new File(appContext.getFilesDir(), WEB_DIR);
         File target = new File(root, version);
         File stamp = new File(target, ".unpacked");
@@ -552,15 +554,16 @@ public final class CcsSidecar {
         if (!file.delete()) Log.w(TAG, "删除失败: " + file);
     }
 
-    private long versionCode() {
-        try {
-            PackageInfo info = appContext.getPackageManager()
-                .getPackageInfo(appContext.getPackageName(), 0);
-            return android.os.Build.VERSION.SDK_INT >= 28
-                ? info.getLongVersionCode() : info.versionCode;
-        } catch (PackageManager.NameNotFoundException e) {
-            return 0L;
-        }
+    /**
+     * webroot 缓存目录名：{@code assets/ccs-web.zip} 的 SHA-256 前 16 位。
+     *
+     * <p>该常量由 {@code app/build.gradle} 从 {@code ext.ccsArtifacts} 注入，
+     * 与构建期校验产物用的是同一个哈希，因此目录名与实际内容严格对应。
+     */
+    private static String webAssetKey() {
+        String sha = BuildConfig.CCS_WEB_SHA256;
+        if (sha == null || sha.isEmpty()) return "unknown";
+        return sha.length() > 16 ? sha.substring(0, 16) : sha;
     }
 
     // ── 日志泵 ──────────────────────────────────────────────────

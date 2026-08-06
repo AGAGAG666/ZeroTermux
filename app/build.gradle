@@ -428,6 +428,12 @@ ext.ccsArtifacts = [
     ]
 ]
 
+// 前端产物哈希下沉到 BuildConfig，供 CcsSidecar 当 webroot 缓存目录的 key。
+// 不能用 versionCode：它不随每次构建递增，而覆盖安装又不清 filesDir，
+// 结果旧前端会被无限复用（前端修复看起来"没生效"就是这个原因）。
+android.defaultConfig.buildConfigField "String", "CCS_WEB_SHA256",
+    "\"" + ext.ccsArtifacts.find { it.name == "ccs-web.zip" }.sha256 + "\""
+
 def sha256Of(File file) {
     def digest = java.security.MessageDigest.getInstance("SHA-256")
     def buffer = new byte[8192]
