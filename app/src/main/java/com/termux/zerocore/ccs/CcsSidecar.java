@@ -64,22 +64,6 @@ public final class CcsSidecar {
     private static final int MIN_SDK_FOR_SIDECAR = 24;
     /** 握手行等待上限。首启要跑数据库迁移（v1→v16，含插入 188 条模型定价）。 */
     private static final long HANDSHAKE_TIMEOUT_MS = 60_000L;
-    /**
-     * sidecar 主动请求宿主重启自己时使用的退出码。
-     *
-     * <p>来自 {@code tauri-shim/src/lib.rs} 的 {@code RESTART_EXIT_CODE}：桌面 Tauri 的
-     * {@code app.restart()} 由框架负责重新拉起进程，shim 无法自己复活，于是约定
-     * 「以 51 退出，由宿主重启」。前端设置页改配置目录后调用的 {@code restart_app}
-     * 走的正是这条路径，宿主必须接住，否则 sidecar 退出后永不回来。
-     */
-    private static final int RESTART_EXIT_CODE = 51;
-    /** 自动重启配额上限（每 {@link #RESTART_WINDOW_MS} 窗口）。防止起不来时无限刷进程。 */
-    private static final int MAX_AUTO_RESTARTS = 3;
-    private static final long RESTART_WINDOW_MS = 60_000L;
-    /** 收到「按设计退出」后的重启间隔：只需让端口与文件锁释放干净。 */
-    private static final long RESTART_DELAY_MS = 300L;
-    /** 意外崩溃后的重启间隔：留出更多余量，避免瞬时故障导致密集重试。 */
-    private static final long CRASH_RESTART_DELAY_MS = 1_500L;
 
     private static final Object LOCK = new Object();
     @Nullable private static CcsSidecar instance;
@@ -111,6 +95,8 @@ public final class CcsSidecar {
     }
 
     private final Context appContext;
+    /** 重启决策（退出码解读、等待时长、自愈配额）见 {@link CcsRestartPolicy}。 */
+    private final CcsRestartPolicy policy = new CcsRestartPolicy(System::currentTimeMillis);
     private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
     @Nullable private Process process;
     @Nullable private Handshake handshake;
@@ -119,8 +105,6 @@ public final class CcsSidecar {
      * 避免「主动重启」与「守护自愈」同时开工起出两个进程。
      */
     private int generation;
-    private int autoRestarts;
-    private long autoRestartWindowStart;
     /** 最近一次成功启动的时刻，用于判断「刚重启过」，避免重复重启。 */
     private long startedAt;
 
@@ -265,7 +249,7 @@ public final class CcsSidecar {
         synchronized (LOCK) {
             Handshake current = handshake;
             if (current != null && process != null && process.isAlive()
-                && System.currentTimeMillis() - startedAt <= freshWindowMs
+                && policy.isFresh(startedAt, freshWindowMs)
                 && healthy(current)) {
                 reuse = current;
             }
@@ -283,8 +267,7 @@ public final class CcsSidecar {
         synchronized (LOCK) {
             shutdownLocked();
             // 用户/前端显式要求的重启不该消耗崩溃自愈配额。
-            autoRestarts = 0;
-            autoRestartWindowStart = System.currentTimeMillis();
+            policy.resetAutoRestarts();
             next = startLocked();
         }
         // 通知一律在锁外发：观察者回调里可能反过来查询状态，持锁会死锁。
@@ -295,7 +278,7 @@ public final class CcsSidecar {
     /**
      * 守护一个已就绪的 sidecar 进程：退出后按退出码决定是否自愈。
      *
-     * <p>退出码 {@link #RESTART_EXIT_CODE} 是 sidecar 按设计请求重启（见常量注释）；
+     * <p>退出码 {@link CcsRestartPolicy#RESTART_EXIT_CODE} 是 sidecar 按设计请求重启；
      * 其余非零退出视为崩溃，同样重启，但共用一份配额，超额后停手并通知观察者，
      * 避免二进制根本起不来时无限刷进程。
      */
@@ -308,12 +291,12 @@ public final class CcsSidecar {
                 Thread.currentThread().interrupt();
                 return;
             }
-            boolean byDesign = code == RESTART_EXIT_CODE;
+            boolean byDesign = CcsRestartPolicy.isByDesignRestart(code);
             Log.w(TAG, "sidecar 退出 exit=" + code + " gen=" + gen
                 + (byDesign ? "（按设计请求重启）" : "（意外退出）"));
 
             try {
-                Thread.sleep(byDesign ? RESTART_DELAY_MS : CRASH_RESTART_DELAY_MS);
+                Thread.sleep(CcsRestartPolicy.restartDelayMs(code));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
@@ -326,7 +309,7 @@ public final class CcsSidecar {
                 if (generation != gen || process != proc) return;
                 process = null;
                 handshake = null;
-                if (!claimAutoRestartLocked()) {
+                if (!policy.claimAutoRestart()) {
                     failure = "CC Switch 本地服务反复退出（exit=" + code + "），已停止自动重启";
                 } else {
                     try {
@@ -347,18 +330,6 @@ public final class CcsSidecar {
         }, "ccs-watchdog-" + gen);
         t.setDaemon(true);
         t.start();
-    }
-
-    /** 领取一次自动重启配额；窗口过期则重置。必须持 {@link #LOCK} 调用。 */
-    private boolean claimAutoRestartLocked() {
-        long now = System.currentTimeMillis();
-        if (now - autoRestartWindowStart > RESTART_WINDOW_MS) {
-            autoRestartWindowStart = now;
-            autoRestarts = 0;
-        }
-        if (autoRestarts >= MAX_AUTO_RESTARTS) return false;
-        autoRestarts++;
-        return true;
     }
 
     /**
