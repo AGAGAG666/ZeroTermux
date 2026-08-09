@@ -12,7 +12,7 @@ class ZTAboutActivity : BaseTitleActivity() {
         setContentView(R.layout.activity_ztabout)
         setBaseTitle(UUtils.getString(R.string.zt_about))
         findViewById<CardView>(R.id.zt_termux_github_card_view).setOnClickListener {
-            UUtils.startUrl("https://github.com/hanxinhao000/ZeroTermux")
+            UUtils.startUrl("https://github.com/AGAGAG666/ZeroTermux-CCS")
         }
 
         findViewById<CardView>(R.id.zt_core_manage_termux_github_card_view).setOnClickListener {
