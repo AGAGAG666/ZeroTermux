@@ -1,6 +1,6 @@
 # 许可
 
-`termux-CCS` 作为 `hanxinhao000/ZeroTermux` 的衍生作品，整体以
+`ZeroTermux-CCS` 作为 `hanxinhao000/ZeroTermux` 的衍生作品，整体以
 [GPLv3 only](https://www.gnu.org/licenses/gpl-3.0.html) 发布。
 
 内置的 cc-switch 组件原为 MIT 协议。MIT 与 GPLv3 单向兼容，因此并入后

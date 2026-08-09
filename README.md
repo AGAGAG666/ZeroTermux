@@ -1,4 +1,4 @@
-# termux-CCS
+# ZeroTermux-CCS
 
 > ZeroTermux 改版 —— 内置 CC Switch 供应商管理与路由代理的 Android 终端环境。
 >
