@@ -18,6 +18,63 @@
 路由代理、模型映射、使用统计、连通性测试、S3/WebDAV 同步、技能管理
 全部是原版实现。
 
+## 安装
+
+从 [Releases](https://github.com/AGAGAG666/ZeroTermux-CCS/releases) 下载对应
+架构的 APK 安装即可，支持覆盖安装（不中断已有终端会话）。
+
+与官方 Termux、ZeroTermux **包名相同**（`com.termux`），三者互相覆盖、
+不能共存。首次从其它版本切换过来前请自行备份 `~`。
+
+sidecar 需要 **Android 7.0（API 24）** 及以上；低于此版本时 CC Switch
+入口不可用，终端功能不受影响。
+
+## 使用
+
+### 打开 CC Switch
+
+侧边栏（左滑抽出）→ **CC Switch**。首次进入会拉起 sidecar 前台服务，
+之后常驻，切后台不被回收；通知栏可见其状态。
+
+界面是 cc-switch 原版 React 前端，操作方式与桌面版一致。
+
+### 配置供应商
+
+在 CC Switch 里增删改供应商、切换当前项。写入的是标准配置文件：
+
+| 文件 | 用途 |
+|---|---|
+| `~/.cc-switch/` | cc-switch 自身配置与供应商库 |
+| `~/.codex/config.toml` `~/.codex/auth.json` | Codex CLI 读取 |
+| `~/.claude/` | Claude Code 读取 |
+
+因为落到的是 CLI 原本就读的文件，终端里的 `codex` 无需任何额外设置。
+
+### 路由代理
+
+Codex 只认 Responses 协议。上游若是 Chat 或 Anthropic 格式，
+需要在 CC Switch 里开启**路由总开关**，由本地代理做协议转换。
+Responses 格式的上游直连，不经转换。
+
+切换供应商后，新起的 codex 进程即时生效（配置每次直读，无缓存）。
+
+### 终端里用 Codex
+
+```bash
+codex
+```
+
+Codex 会话会自动归入右侧会话列表，可点击直接切换到对应终端画面。
+
+## 排障
+
+| 现象 | 处理 |
+|---|---|
+| CC Switch 打不开 / 白屏 | 通知栏确认 sidecar 在跑；杀掉服务重进即可重启 |
+| 请求报 HTTP 400 且响应体是 HTML | 上游网关拦截，多为请求体过大，`/compact` 压缩上下文 |
+| 请求报 400 且响应体是 JSON | 多为额度或参数问题，看 `message` 字段 |
+| 切了供应商但模型没变 | 检查该供应商的模型映射；不在 `modelCatalog` 内的模型会被改写成配置里的默认模型 |
+
 ## 架构
 
 ```
