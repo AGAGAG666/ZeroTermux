@@ -39,9 +39,21 @@ public final class TextStyle {
     public final static int COLOR_INDEX_FOREGROUND = 256;
     public final static int COLOR_INDEX_BACKGROUND = 257;
     public final static int COLOR_INDEX_CURSOR = 258;
+    /**
+     * Foreground color used for cells rendered with the dim (faint) attribute, i.e. SGR 2.
+     * When this entry equals {@link #DIM_FOREGROUND_UNSET} the legacy xterm/libvte behaviour is used
+     * instead, which simply scales the regular foreground color down to two thirds of its intensity.
+     */
+    public final static int COLOR_INDEX_DIM_FOREGROUND = 259;
 
-    /** The 256 standard color entries and the three special (foreground, background and cursor) ones. */
-    public final static int NUM_INDEXED_COLORS = 259;
+    /** Sentinel stored in {@link #COLOR_INDEX_DIM_FOREGROUND} while the user has not configured a dim color. */
+    public final static int DIM_FOREGROUND_UNSET = 0;
+
+    /**
+     * The 256 standard color entries and the four special (foreground, background, cursor and dim
+     * foreground) ones.
+     */
+    public final static int NUM_INDEXED_COLORS = 260;
 
     /** Normal foreground and background colors and no effects. */
     final static long NORMAL = encode(COLOR_INDEX_FOREGROUND, COLOR_INDEX_BACKGROUND, 0);

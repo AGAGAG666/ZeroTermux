@@ -11,6 +11,8 @@ import java.util.Properties;
  */
 public final class TerminalColorScheme {
 
+    private static final String LOG_TAG = "TerminalColorScheme";
+
     /** http://upload.wikimedia.org/wikipedia/en/1/15/Xterm_256color_chart.svg, but with blue color brighter. */
     private static final int[] DEFAULT_COLORSCHEME = {
         // 16 original colors. First 8 are dim.
@@ -57,7 +59,10 @@ public final class TerminalColorScheme {
         0xff808080, 0xff8a8a8a, 0xff949494, 0xff9e9e9e, 0xffa8a8a8, 0xffb2b2b2, 0xffbcbcbc, 0xffc6c6c6, 0xffd0d0d0, 0xffdadada, 0xffe4e4e4, 0xffeeeeee,
 
         // COLOR_INDEX_DEFAULT_FOREGROUND, COLOR_INDEX_DEFAULT_BACKGROUND and COLOR_INDEX_DEFAULT_CURSOR:
-        0xffffffff, 0xff000000, 0xffffffff};
+        0xffffffff, 0xff000000, 0xffffffff,
+
+        // COLOR_INDEX_DIM_FOREGROUND: unset by default so dim text keeps the legacy 2/3 scaling.
+        TextStyle.DIM_FOREGROUND_UNSET};
 
     public final int[] mDefaultColors = new int[TextStyle.NUM_INDEXED_COLORS];
 
@@ -84,6 +89,8 @@ public final class TerminalColorScheme {
             } else if (key.equals("cursor")) {
                 colorIndex = TextStyle.COLOR_INDEX_CURSOR;
                 cursorPropExists = true;
+            } else if (key.equals("dimforeground")) {
+                colorIndex = TextStyle.COLOR_INDEX_DIM_FOREGROUND;
             } else if (key.startsWith("color")) {
                 try {
                     colorIndex = Integer.parseInt(key.substring(5));
@@ -91,12 +98,18 @@ public final class TerminalColorScheme {
                     throw new IllegalArgumentException("Invalid property: '" + key + "'");
                 }
             } else {
-                throw new IllegalArgumentException("Invalid property: '" + key + "'");
+                // Unknown keys are skipped rather than aborting the whole file. Bailing out here used to
+                // leave mDefaultColors half updated, which corrupted the entire scheme whenever a
+                // colors.properties written for a newer version was read by an older one.
+                Logger.logWarn(null, LOG_TAG, "Ignoring unsupported property: '" + key + "'");
+                continue;
             }
 
             int colorValue = TerminalColors.parse(value);
-            if (colorValue == 0)
-                throw new IllegalArgumentException("Property '" + key + "' has invalid color: '" + value + "'");
+            if (colorValue == 0) {
+                Logger.logWarn(null, LOG_TAG, "Ignoring property '" + key + "' with invalid color: '" + value + "'");
+                continue;
+            }
 
             mDefaultColors[colorIndex] = colorValue;
         }

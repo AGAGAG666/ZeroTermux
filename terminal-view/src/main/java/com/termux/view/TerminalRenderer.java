@@ -219,15 +219,21 @@ public final class TerminalRenderer {
 
         if ((effect & TextStyle.CHARACTER_ATTRIBUTE_INVISIBLE) == 0) {
             if (dim) {
-                int red = (0xFF & (foreColor >> 16));
-                int green = (0xFF & (foreColor >> 8));
-                int blue = (0xFF & foreColor);
-                // Dim color handling used by libvte which in turn took it from xterm
-                // (https://bug735245.bugzilla-attachments.gnome.org/attachment.cgi?id=284267):
-                red = red * 2 / 3;
-                green = green * 2 / 3;
-                blue = blue * 2 / 3;
-                foreColor = 0xFF000000 + (red << 16) + (green << 8) + blue;
+                final int configuredDimColor = palette[TextStyle.COLOR_INDEX_DIM_FOREGROUND];
+                if (configuredDimColor != TextStyle.DIM_FOREGROUND_UNSET) {
+                    // The user picked an explicit color for dim (SGR 2) text in colors.properties.
+                    foreColor = configuredDimColor;
+                } else {
+                    int red = (0xFF & (foreColor >> 16));
+                    int green = (0xFF & (foreColor >> 8));
+                    int blue = (0xFF & foreColor);
+                    // Dim color handling used by libvte which in turn took it from xterm
+                    // (https://bug735245.bugzilla-attachments.gnome.org/attachment.cgi?id=284267):
+                    red = red * 2 / 3;
+                    green = green * 2 / 3;
+                    blue = blue * 2 / 3;
+                    foreColor = 0xFF000000 + (red << 16) + (green << 8) + blue;
+                }
             }
 
             mTextPaint.setFakeBoldText(bold);
