@@ -22,22 +22,34 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: 下载构建产物
+      - name: 下载 Debug 构建产物
         uses: actions/download-artifact@v7
         with:
           name: ZeroTermux-Nightly_debug_arm64-v8a
-          path: dist
+          path: dist/debug
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.build_run_id }}
 
-      - name: 发布 APK
+      - name: 下载 Release 构建产物
+        uses: actions/download-artifact@v7
+        with:
+          name: ZeroTermux-Nightly_release_arm64-v8a
+          path: dist/release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.build_run_id }}
+
+      - name: 发布 Debug 和 Release APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          apk="$(find dist -type f -name '*.apk' -print -quit)"
-          test -n "$apk"
-          gh release upload "${{ inputs.release_tag }}" "$apk" \
+          debug_apk="$(find dist/debug -type f -name '*.apk' -print -quit)"
+          release_apk="$(find dist/release -type f -name '*.apk' -print -quit)"
+          test -n "$debug_apk"
+          test -n "$release_apk"
+          gh release upload "${{ inputs.release_tag }}" \
+            "$debug_apk" "$release_apk" \
             --repo "${{ github.repository }}" --clobber
           gh release edit "${{ inputs.release_tag }}" \
             --repo "${{ github.repository }}" --draft=false
