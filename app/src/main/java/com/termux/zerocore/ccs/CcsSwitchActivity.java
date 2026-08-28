@@ -88,7 +88,7 @@ public class CcsSwitchActivity extends AppCompatActivity
         settings.setAllowFileAccessFromFileURLs(false);
         settings.setAllowUniversalAccessFromFileURLs(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        // 桌面前端按 CSS 像素布局，禁掉 WebView 的自动缩放，交由 mobile.css 覆盖层适配。
+        // 保持 WebView 的 CSS 像素布局和上游 CCS 页面样式，不注入额外 UI 覆盖层。
         settings.setUseWideViewPort(false);
         settings.setLoadWithOverviewMode(false);
         settings.setSupportZoom(false);
