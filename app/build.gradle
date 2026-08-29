@@ -270,7 +270,7 @@ android {
         jniLibs {
             useLegacyPackaging true
             // sidecar 是可执行 ELF，保留其完整 section table，确保 APK 内字节与发布资产一致。
-            keepDebugSymbols.add("libccsidecar.so")
+            keepDebugSymbols.add("**/libccsidecar.so")
         }
         //ZeroTermux add {@
         // 排除重复的 META-INF 文件
