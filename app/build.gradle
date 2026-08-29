@@ -425,7 +425,7 @@ ext.ccsArtifacts = [
     [
         name    : "ccs-web.zip",
         dest    : "ccs-artifacts/assets/ccs-web.zip",
-        sha256  : "dde4122c214bc393730082cb9187049270cfc35c73229593f26b716397f0d9fb",
+        sha256  : "b5e8979b6ca513da1f4798ce51fd791582010ced5ebe18f4a4a5349dc11085d7",
         size    : 2080120L
     ]
 ]
