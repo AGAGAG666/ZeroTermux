@@ -2039,6 +2039,11 @@ cd ~ &amp;&amp; pkg update -y \n
     <string name="codex_provider_apply_failed">Could not apply provider</string>
     <string name="cc_switch_title">CC Switch</string>
     <string name="cc_switch_subtitle">Codex provider management</string>
+    <string name="ccs_web_port_title">CC Switch Web Port</string>
+    <string name="ccs_web_port_summary">Current Web port: %1$d</string>
+    <string name="ccs_web_port_dialog_title">Set CC Switch Web Port</string>
+    <string name="ccs_web_port_invalid">Enter a Web port from 1024 to 65535</string>
+    <string name="ccs_web_port_saved">Web port saved. Reopen CC Switch to apply</string>
     <string name="ccs_route">Route proxy</string>
     <string name="ccs_usage">Usage</string>
     <string name="ccs_presets">Presets</string>

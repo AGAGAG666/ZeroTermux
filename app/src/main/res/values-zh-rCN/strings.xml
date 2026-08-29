@@ -2009,4 +2009,9 @@
     <string name="ccs_import_export">导入 / 导出</string>
     <string name="ccs_settings">设置</string>
 
+    <string name="ccs_web_port_title">CC Switch Web 服务端口</string>
+    <string name="ccs_web_port_summary">当前 Web 端口：%1$d</string>
+    <string name="ccs_web_port_dialog_title">设置 CC Switch Web 服务端口</string>
+    <string name="ccs_web_port_invalid">请输入 1024 到 65535 之间的 Web 端口</string>
+    <string name="ccs_web_port_saved">Web 端口已保存，重新打开 CC Switch 后生效</string>
 </resources>

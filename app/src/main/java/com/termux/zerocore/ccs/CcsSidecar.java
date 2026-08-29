@@ -7,6 +7,7 @@ import androidx.annotation.Nullable;
 
 import com.termux.BuildConfig;
 import com.termux.shared.termux.TermuxConstants;
+import com.termux.zerocore.ftp.utils.UserSetManage;
 
 import org.json.JSONObject;
 
@@ -182,9 +183,11 @@ public final class CcsSidecar {
 
         List<String> cmd = new ArrayList<>();
         cmd.add(binary.getAbsolutePath());
-        // 端口交内核分配，避免与用户已有服务/上一次残留端口冲突。
+        // Web 服务监听端口由 ZeroTermux 设置控制，默认 17132。
         cmd.add("--port");
-        cmd.add("0");
+        cmd.add(String.valueOf(
+            UserSetManage.Companion.get().getZTUserBean().getCcsWebPort()
+        ));
         if (webroot != null) {
             cmd.add("--webroot");
             cmd.add(webroot.getAbsolutePath());

@@ -15,6 +15,7 @@ import com.termux.zerocore.config.mainmenu.config.CloseTurnNetworkAdbClickConfig
 import com.termux.zerocore.config.mainmenu.config.CommandDefinitionCLickConfig;
 import com.termux.zerocore.config.mainmenu.config.CommonlyUsedSoftLinksDataClickConfig;
 import com.termux.zerocore.config.mainmenu.config.ContainerSwitchClickConfig;
+import com.termux.zerocore.config.mainmenu.config.CcsSwitchClickConfig;
 import com.termux.zerocore.config.mainmenu.config.CreateCProjectClickConfig;
 import com.termux.zerocore.config.mainmenu.config.CreateJavaProjectClickConfig;
 import com.termux.zerocore.config.mainmenu.config.CreateNpmProjectClickConfig;
@@ -93,6 +94,7 @@ public class MainMenuConfig implements BaseConfig {
         commonClicks.add(new ReleaseLinuxVersionClickConfig());
         commonClicks.add(new QEMUClickConfig());
         commonClicks.add(new ZTSettingsClickConfig());
+        commonClicks.add(new CcsSwitchClickConfig());
         MAIN_MENU_CATEGORY_DATAS.add(new MainMenuCategoryData(context.getString(R.string.common_functions), CODE_COMMON_FUNCTIONS, commonClicks));
 
         // 创建项目

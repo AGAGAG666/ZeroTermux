@@ -3,6 +3,9 @@ package com.termux.zerocore.bean;
 import com.termux.shared.termux.settings.properties.TermuxPropertyConstants;
 
 public class ZTUserBean {
+    // CC Switch Web 服务端口（默认 17132，可在 ZeroTermux 设置中修改）
+    private int ccsWebPort = 17132;
+
     // 是否打开ZT下载服务器
     private boolean isOpenDownloadFileServices = false;
     // 是否打开ZT电脑工作站 (Web 19999)
@@ -503,6 +506,14 @@ public class ZTUserBean {
 
     public void setZtAiDebugRootEnabled(boolean ztAiDebugRootEnabled) {
         isZtAiDebugRootEnabled = ztAiDebugRootEnabled;
+    }
+
+    public int getCcsWebPort() {
+        return ccsWebPort;
+    }
+
+    public void setCcsWebPort(int ccsWebPort) {
+        this.ccsWebPort = ccsWebPort;
     }
 
     public boolean isInputMethodTriggerClose() {

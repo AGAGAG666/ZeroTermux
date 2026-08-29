@@ -125,6 +125,8 @@
             click="java:com.termux.zerocore.config.mainmenu.config.QEMUClickConfig" />
         <item tag="ZT设置"
             click="java:com.termux.zerocore.config.mainmenu.config.ZTSettingsClickConfig" />
+        <item tag="CC Switch"
+            click="java:com.termux.zerocore.config.mainmenu.config.CcsSwitchClickConfig" />
     </group>
 
     <group name="创建项目">

@@ -1,8 +1,12 @@
 package com.termux.zerocore.settings
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.text.InputType
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Toast
 import android.widget.TextView
 import androidx.appcompat.widget.SwitchCompat
 import androidx.cardview.widget.CardView
@@ -34,6 +38,8 @@ class ZeroTermuxSettingsActivity : BaseTitleActivity() {
 
     private val mSettingsKeywordFunCardViewLayout by lazy { findViewById<CardView>(R.id.settings_keyword_fun_card) }
     private val mSettingsKeywordFunTextView by lazy { findViewById<TextView>(R.id.settings_keyword_fun_text_summary) }
+    private val ccsWebPortCard by lazy { findViewById<CardView>(R.id.ccs_web_port_card) }
+    private val ccsWebPortSummary by lazy { findViewById<TextView>(R.id.ccs_web_port_summary) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +55,7 @@ class ZeroTermuxSettingsActivity : BaseTitleActivity() {
         setSwitchStatus(isToolShowSwitch, isToolShowLl)
         setSwitchStatus(volumeFunctionSwitch, volumeFunctionLl)
         setSwitchStatus(editorWordWrapSwitch, editorWordWrapLl)
+        ccsWebPortCard.setOnClickListener { showCcsWebPortDialog() }
         findViewById<CardView>(R.id.save_path).setOnClickListener {
             val intent = Intent(this, TermuxGuideActivity::class.java)
             intent.putExtra(GUIDE_EXTRA, GUIDE_CREATE_FOLDER)
@@ -64,6 +71,7 @@ class ZeroTermuxSettingsActivity : BaseTitleActivity() {
         isToolShowSwitch.isChecked = ztUserBean.isToolShow
         volumeFunctionSwitch.isChecked = ztUserBean.isResetVolume
         editorWordWrapSwitch.isChecked = ztUserBean.isEditorWordWrap
+        ccsWebPortSummary.text = getString(R.string.ccs_web_port_summary, ztUserBean.ccsWebPort)
         mSettingsKeywordFunTextView.text =
             "${UUtils.getString(R.string.settings_keyword_summary1)}: " +
                 "${KeyWordFunDialog.getDoubleClickString(ztUserBean.doubleClickFun)}\n" +
@@ -79,6 +87,38 @@ class ZeroTermuxSettingsActivity : BaseTitleActivity() {
                         "${UUtils.getString(R.string.settings_keyword_summary)}"
             }
         }
+    }
+
+    private fun showCcsWebPortDialog() {
+        val currentPort = UserSetManage.get().getZTUserBean().ccsWebPort
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(currentPort.toString())
+            setSelection(text.length)
+            hint = "17132"
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.ccs_web_port_dialog_title)
+            .setView(input)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val port = input.text.toString().trim().toIntOrNull()
+                if (port == null || port !in 1024..65535) {
+                    Toast.makeText(this, R.string.ccs_web_port_invalid, Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val bean = UserSetManage.get().getZTUserBean()
+                bean.ccsWebPort = port
+                UserSetManage.get().setZTUserBean(bean)
+                ccsWebPortSummary.text = getString(R.string.ccs_web_port_summary, port)
+                Toast.makeText(this, R.string.ccs_web_port_saved, Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
     }
 
     private fun setSwitchStatus(switchCompat: SwitchCompat, linearLayout: LinearLayout) {
